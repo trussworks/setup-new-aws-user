@@ -1,0 +1,9 @@
+---
+default: true
+line_length: true
+no-duplicate-header:
+  siblings_only: true
+commands-show-output: false
+fenced-code-language: false
+code-block-style:
+  style: consistent
