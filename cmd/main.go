@@ -69,6 +69,7 @@ func setCfgKey(cfg *ini.File, section string, key string, value string) *ini.Fil
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return cfg
 }
 
@@ -116,12 +117,14 @@ func getAccessKey() (string, string, error) {
 	}
 
 	accessKeySecret, err := readLine("Enter temporary AWS Secret Access Key: ")
+	if err != nil {
+		return accessKeyID, "", err
+	}
 
 	return accessKeyID, accessKeySecret, nil
 }
 
 func checkStsAccess(stsSvc *sts.STS) error {
-	// * Verify access to AWS using the temporary credentials we have
 	log.Println("Testing access to AWS...")
 
 	input := &sts.GetCallerIdentityInput{}
@@ -133,30 +136,39 @@ func checkStsAccess(stsSvc *sts.STS) error {
 	return nil
 }
 
-func createVirtualMfaDevice() (string, string, error) {
+func createVirtualMfaDevice(iamSvc *iam.IAM) (string, string, error) {
 	// Creates a virtual MFA device for the user specified in the AwsProfile
-	// cli option
+	// cli option. Returns mfaDeviceARN, mfaDeviceSerial, err
 
 	// TODO: Finish dereferencing what we need from the new MFA device, and
 	// return appropriate values
 
-	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
-		VirtualMFADeviceName: aws.String(options.AwsProfile),
-	}
-	// func (c *IAM) CreateVirtualMFADevice(input *CreateVirtualMFADeviceInput) (*CreateVirtualMFADeviceOutput, error)
-	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.CreateVirtualMFADevice
-	mfaDeviceOutput, err := iam.CreateVirtualMFADevice(*mfaDeviceInput)
-	if err != nil {
-		return "", "", err
-	}
-	mfaDevice := *mfaDeviceOutput.VirtualMFADevice.SerialNumber
-	// func (c *IAM) EnableMFADevice(input *EnableMFADeviceInput) (*EnableMFADeviceOutput, error)
-	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.EnableMFADevice
+	// mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
+	// 	VirtualMFADeviceName: aws.String(options.AwsProfile),
+	// }
+	// mfaDeviceOutput, err := iamSvc.CreateVirtualMFADevice(mfaDeviceInput)
+	// if err != nil {
+	// 	return "", "", err
+	// }
 
-	return "arn:aws:iam::123456789012:mfa/foobar", "arn:aws:iam::123456789012:role/foobar", nil
+	// https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#VirtualMFADevice
+	// mfaDeviceSerial := *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+
+	// TODO: Enable the MFA device
+	//       - Ask the user for MFA token(s) required by the EnableVirtualMFADevice call
+	//       - Validate that the tokens are 6 character integers & store them so they
+	//         can't be reused
+	//       - Call EnableVirtualMFADevice
+	//       - Check that the device is correct by polling ListVirtualMFADevices with
+	//         assignment status "Assigned"
+	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.EnableVirtualMFADevice
+	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.ListVirtualMFADevices
+
+	// TODO: return real mfaDeviceARN and mfaDeviceSerial
+	return "arn:aws:iam::123456789012:mfa/foobar", "0123456789", nil
 }
 
-func configureAwsCliProfile(cfgMfaArn string, cfgProfileArn string) error {
+func configureAwsCliProfile(mfaArn string, profileArn string) error {
 	// Sets up the configuration for the new profile in ~/.aws/config
 	awsCfgPath := "my.ini.local" // TODO: Save to the real path
 
@@ -171,10 +183,10 @@ func configureAwsCliProfile(cfgMfaArn string, cfgProfileArn string) error {
 
 	iniFile = setCfgKey(iniFile, cfgProfileName, "region", options.AwsRegion)
 	iniFile = setCfgKey(
-		iniFile, cfgProfileName, "mfa_serial", cfgMfaArn,
+		iniFile, cfgProfileName, "mfa_serial", mfaArn,
 	)
 	iniFile = setCfgKey(
-		iniFile, cfgProfileName, "role_arn", cfgProfileArn,
+		iniFile, cfgProfileName, "role_arn", profileArn,
 	)
 	iniFile = setCfgKey(iniFile, cfgProfileName, "output", options.Output)
 
@@ -209,6 +221,7 @@ func main() {
 	os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", accessKeySecret)
 
+	// Create STS and IAM sessions
 	sessionOpts := session.Options{
 		Config: aws.Config{
 			// Why aws.String(): https://github.com/aws/aws-sdk-go/issues/363
@@ -216,12 +229,17 @@ func main() {
 			CredentialsChainVerboseErrors: aws.Bool(true),
 		},
 	}
-
 	sess, err := session.NewSessionWithOptions(sessionOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	stsSvc := sts.New(sess)
 	iamSvc := iam.New(sess)
 
+	// * Verify access to AWS using the temporary credentials we have
 	log.Println("Checking STS access...")
+
 	err = checkStsAccess(stsSvc)
 	if err != nil {
 		log.Fatal(err)
@@ -231,26 +249,42 @@ func main() {
 
 	// * Create the virtual MFA device
 	log.Println("Creating the virtual MFA device...")
-	cfgMfaArn, cfgMfaSerial, err := createVirtualMfaDevice(iamSvc)
+
+	mfaArn, mfaSerial, err := createVirtualMfaDevice(iamSvc)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// * Print the MFA serial as a QRcode
+	text2qr(mfaSerial)
+
 	// * Configure the AWS CLI profile
 	log.Println("Configuring aws-cli...")
-	err = configureAwsCliProfile(cfgMfaArn, cfgProfileArn)
+
+	getUserInput := &iam.GetUserInput{
+		UserName: aws.String(options.AwsProfile),
+	}
+	getUserOutput, err := iamSvc.GetUser(getUserInput)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	profileArn := *getUserOutput.User.Arn
+
+	err = configureAwsCliProfile(mfaArn, profileArn)
 	if err != nil {
 		log.Fatal(err)
 	} else {
 		log.Println("Success!")
 	}
 
-	// * Verify access to AWS using the MFA device & config file
+	// * Verify access to AWS using the newly created MFA device & config file
 	//   We unset the environment variables to ensure the access keys are read
 	//   from the keyring
 	log.Println("Checking STS access...")
 	os.Unsetenv("AWS_ACCESS_KEY_ID")
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+
 	err = checkStsAccess(stsSvc)
 	if err != nil {
 		log.Fatal(err)
@@ -260,6 +294,7 @@ func main() {
 
 	// * Rotate AWS keys
 	log.Println("Rotating out the temporary AWS access keys...")
+
 	err = rotateKeys()
 	if err != nil {
 		log.Fatal(err)
