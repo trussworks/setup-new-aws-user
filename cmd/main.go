@@ -259,6 +259,8 @@ func main() {
 	// * Print the MFA serial as a QRcode
 	text2qr(mfaSerial)
 
+	// TODO: Activate the virtual MFA device
+
 	// * Configure the AWS CLI profile
 	log.Println("Configuring aws-cli...")
 
