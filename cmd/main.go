@@ -18,12 +18,13 @@ import (
 	"strings"
 )
 
+// TODO: How does it know my AWS username?
 type cliOptions struct {
 	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"region"`
 	AwsAccountID   int    `required:"true" env:"AWS_ACCOUNT_ID" long:"account_id" description:"account id"`
 	AwsProfile     string `required:"true" env:"AWS_PROFILE" long:"profile" description:"profile name"`
 	AwsRootProfile string `env:"AWS_ROOT_PROFILE" long:"root_profile" description:"root profile name"`
-	AwsIDProfile   string `env:"" long:"id_profile" description:"id profile name"`
+	AwsIDProfile   string `env:"AWS_ID_PROFILE" long:"id_profile" description:"id profile name"`
 	Role           string `long:"role" choice:"admin-org-root" choice:"engineer" choice:"admin" description:"user role type"`
 	Output         string `long:"output" default:"json" description:"aws-cli output format"`
 }
