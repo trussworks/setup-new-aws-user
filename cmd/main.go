@@ -264,17 +264,17 @@ func main() {
 	// * Configure the AWS CLI profile
 	log.Println("Configuring aws-cli...")
 
-	getUserInput := &iam.GetUserInput{
-		UserName: aws.String(options.AwsProfile),
-	}
-	getUserOutput, err := iamSvc.GetUser(getUserInput)
+	// profileArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", options.AccountID, options.???)
+
+	err = configureAwsCliProfile(mfaArn, profileArn)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	profileArn := *getUserOutput.User.Arn
+	// * Rotate AWS keys
+	log.Println("Rotating out the temporary AWS access keys...")
 
-	err = configureAwsCliProfile(mfaArn, profileArn)
+	err = rotateKeys()
 	if err != nil {
 		log.Fatal(err)
 	} else {
@@ -289,16 +289,6 @@ func main() {
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
 
 	err = checkStsAccess(stsSvc)
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		log.Println("Success!")
-	}
-
-	// * Rotate AWS keys
-	log.Println("Rotating out the temporary AWS access keys...")
-
-	err = rotateKeys()
 	if err != nil {
 		log.Fatal(err)
 	} else {
