@@ -3,29 +3,42 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/jessevdk/go-flags"
-	qr "github.com/mdp/qrterminal"
-	"gopkg.in/ini.v1"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/jessevdk/go-flags"
+	"github.com/skip2/go-qrcode"
+	"gopkg.in/ini.v1"
 )
 
 type cliOptions struct {
 	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"region"`
 	AwsAccountID   int    `required:"true" env:"AWS_ACCOUNT_ID" long:"account_id" description:"account id"`
 	AwsProfile     string `required:"true" env:"AWS_PROFILE" long:"profile" description:"profile name"`
+	AwsIDProfile   string `required:"true" env:"AWS_ID_PROFILE" long:"id_profile" description:"id profile name"`
 	AwsRootProfile string `env:"AWS_ROOT_PROFILE" long:"root_profile" description:"root profile name"`
-	AwsIDProfile   string `env:"" long:"id_profile" description:"id profile name"`
-	Role           string `long:"role" choice:"admin-org-root" choice:"engineer" choice:"admin" description:"user role type"`
+	IAMUser        string `required:"true" env:"" long:"iam_user" description:"iam user name"`
+	Role           string `required:"true" long:"role" choice:"admin-org-root" choice:"engineer" choice:"admin" description:"user role type"`
 	Output         string `long:"output" default:"json" description:"aws-cli output format"`
+}
+
+func (c *cliOptions) checkProfileVars() error {
+	if c.AwsProfile != c.AwsRootProfile && c.AwsProfile != c.AwsIDProfile {
+		return fmt.Errorf("found AWS_PROFILE=%q, expecting AWS_PROFILE to match AWS_ROOT_PROFILE (%q) or AWS_ID_PROFILE (%q); there are no users in other accounts, just roles",
+			c.AwsProfile,
+			c.AwsRootProfile,
+			c.AwsIDProfile,
+		)
+	}
+	return nil
 }
 
 var (
@@ -33,16 +46,11 @@ var (
 )
 
 func text2qr(payload string) {
-	// Generate a QRcode and print it to the terminal as text
-	qrconfig := qr.Config{
-		Level:     qr.M,      // redundancy level
-		Writer:    os.Stdout, // where to print the result
-		BlackChar: qr.BLACK,
-		WhiteChar: qr.WHITE,
-		QuietZone: 1, // size of the padding around it
+	q, err := qrcode.New(payload, qrcode.Medium)
+	if err != nil {
+		log.Fatal(err)
 	}
-	// TODO: does this return err? if so, handle it
-	qr.GenerateWithConfig(payload, qrconfig)
+	fmt.Println(q.ToSmallString(false))
 }
 
 func checkAwsCfg() {
@@ -136,36 +144,61 @@ func checkStsAccess(stsSvc *sts.STS) error {
 	return nil
 }
 
-func createVirtualMfaDevice(iamSvc *iam.IAM) (string, string, error) {
-	// Creates a virtual MFA device for the user specified in the AwsProfile
-	// cli option. Returns mfaDeviceARN, mfaDeviceSerial, err
+// Creates a virtual MFA device for the user specified in the AwsProfile
+// cli option. Returns mfaDeviceSerial, err
+func createVirtualMfaDevice(iamSvc *iam.IAM) (string, error) {
+	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
+		VirtualMFADeviceName: aws.String(options.IAMUser),
+	}
 
-	// TODO: Finish dereferencing what we need from the new MFA device, and
-	// return appropriate values
+	mfaDeviceOutput, err := iamSvc.CreateVirtualMFADevice(mfaDeviceInput)
+	if err != nil {
+		return "", err
+	}
 
-	// mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
-	// 	VirtualMFADeviceName: aws.String(options.AwsProfile),
-	// }
-	// mfaDeviceOutput, err := iamSvc.CreateVirtualMFADevice(mfaDeviceInput)
-	// if err != nil {
-	// 	return "", "", err
-	// }
-
+	// For the QR code, create a string that encodes:
+	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#VirtualMFADevice
-	// mfaDeviceSerial := *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	content := fmt.Sprintf("otpauth://totp/%s@%s?secret=%s",
+		*mfaDeviceInput.VirtualMFADeviceName,
+		options.AwsProfile,
+		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
+	)
 
-	// TODO: Enable the MFA device
-	//       - Ask the user for MFA token(s) required by the EnableVirtualMFADevice call
-	//       - Validate that the tokens are 6 character integers & store them so they
-	//         can't be reused
-	//       - Call EnableVirtualMFADevice
-	//       - Check that the device is correct by polling ListVirtualMFADevices with
-	//         assignment status "Assigned"
+	text2qr(content)
+
+	return *mfaDeviceOutput.VirtualMFADevice.SerialNumber, nil
+}
+
+func enableVirtualMFADevice(iamSvc *iam.IAM, mfaSerial string) {
+	// TODO:
+	// - Validate that the tokens are 6 character integers & store them so they
+	//   can't be reused
+	// - Check that the device is correct by polling ListVirtualMFADevices with
+	//   assignment status "Assigned"
 	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.EnableVirtualMFADevice
 	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.ListVirtualMFADevices
 
-	// TODO: return real mfaDeviceARN and mfaDeviceSerial
-	return "arn:aws:iam::123456789012:mfa/foobar", "0123456789", nil
+	// get two auth codes from user
+	authToken1, err := readLine("First MFA token: ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	authToken2, err := readLine("Second MFA token: ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	enableMFADeviceInput := &iam.EnableMFADeviceInput{
+		AuthenticationCode1: aws.String(authToken1),
+		AuthenticationCode2: aws.String(authToken2),
+		SerialNumber:        aws.String(mfaSerial),
+		UserName:            aws.String(options.IAMUser),
+	}
+
+	_, err = iamSvc.EnableMFADevice(enableMFADeviceInput)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func configureAwsCliProfile(mfaArn string, profileArn string) error {
@@ -201,6 +234,12 @@ func configureAwsCliProfile(mfaArn string, profileArn string) error {
 func main() {
 	parser := flags.NewParser(&options, flags.Default)
 	_, err := parser.Parse()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// check aws profile environment variables
+	err = options.checkProfileVars()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -250,28 +289,28 @@ func main() {
 	// * Create the virtual MFA device
 	log.Println("Creating the virtual MFA device...")
 
-	mfaArn, mfaSerial, err := createVirtualMfaDevice(iamSvc)
+	mfaSerial, err := createVirtualMfaDevice(iamSvc)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// * Print the MFA serial as a QRcode
-	text2qr(mfaSerial)
+	enableVirtualMFADevice(iamSvc, mfaSerial)
 
 	// * Configure the AWS CLI profile
 	log.Println("Configuring aws-cli...")
 
 	getUserInput := &iam.GetUserInput{
-		UserName: aws.String(options.AwsProfile),
+		UserName: aws.String(options.IAMUser),
 	}
-	getUserOutput, err := iamSvc.GetUser(getUserInput)
+	_, err = iamSvc.GetUser(getUserInput)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	profileArn := *getUserOutput.User.Arn
+	profileArn := fmt.Sprintf("arn:aws:iam::%v:role/%v",
+		options.AwsAccountID, options.Role)
 
-	err = configureAwsCliProfile(mfaArn, profileArn)
+	err = configureAwsCliProfile(mfaSerial, profileArn)
 	if err != nil {
 		log.Fatal(err)
 	} else {
