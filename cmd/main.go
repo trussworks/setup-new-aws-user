@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/99designs/aws-vault/vault"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -69,16 +70,6 @@ func checkAwsCfg() {
 			log.Fatalf("Profile %q already exists! If you want to replace it, delete the existing profile in your ~/.aws/config file.", options.AwsProfile)
 		}
 	}
-}
-
-func setCfgKey(cfg *ini.File, section string, key string, value string) *ini.File {
-	// Set a key value in an ini file
-	_, err := cfg.Section(section).NewKey(key, value)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return cfg
 }
 
 func rotateKeys() error {
@@ -202,32 +193,23 @@ func enableVirtualMFADevice(iamSvc *iam.IAM, mfaSerial string) {
 }
 
 func configureAwsCliProfile(mfaArn string, profileArn string) error {
-	// Sets up the configuration for the new profile in ~/.aws/config
-	awsCfgPath := "my.ini.local" // TODO: Save to the real path
-
-	cfgProfileName := fmt.Sprintf("profile %s", options.AwsProfile)
-
-	// TODO: some of this logic is duplicated in checkAwsCfg
-	awscfg := path.Join(os.Getenv("HOME"), ".aws", "config")
-	iniFile, err := ini.Load(awscfg)
+	configFile, err := vault.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
 
-	iniFile = setCfgKey(iniFile, cfgProfileName, "region", options.AwsRegion)
-	iniFile = setCfgKey(
-		iniFile, cfgProfileName, "mfa_serial", mfaArn,
-	)
-	iniFile = setCfgKey(
-		iniFile, cfgProfileName, "role_arn", profileArn,
-	)
-	iniFile = setCfgKey(iniFile, cfgProfileName, "output", options.Output)
+	profileSection := vault.Profile{
+		Name:      options.AwsProfile,
+		MFASerial: mfaArn,
+		RoleARN:   profileArn,
+		Region:    options.AwsRegion,
+	}
 
-	// TODO: Back up the file before over writing it?
-	err = iniFile.SaveTo(awsCfgPath)
+	err = configFile.Add(profileSection)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
