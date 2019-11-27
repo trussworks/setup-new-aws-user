@@ -43,9 +43,7 @@ func (c *cliOptions) validateProfileVars() error {
 
 // User holds information for the AWS user being configured by this script
 type User struct {
-	IAMUser   string
-	Role      string
-	MFASerial string
+	Name string
 }
 
 // MFAManager handles the MFA setup for a user
@@ -81,7 +79,7 @@ func (m *MFAManager) CreateVirtualMFADevice() error {
 	log.Println("Creating the virtual MFA device...")
 
 	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
-		VirtualMFADeviceName: aws.String(m.User.IAMUser),
+		VirtualMFADeviceName: aws.String(m.User.Name),
 	}
 
 	mfaDeviceOutput, err := m.Service.CreateVirtualMFADevice(mfaDeviceInput)
@@ -144,7 +142,7 @@ func (m *MFAManager) EnableVirtualMFADevice() error {
 		AuthenticationCode1: aws.String(authToken1),
 		AuthenticationCode2: aws.String(authToken2),
 		SerialNumber:        aws.String(m.Profile.MFASerial),
-		UserName:            aws.String(m.User.IAMUser),
+		UserName:            aws.String(m.User.Name),
 	}
 
 	_, err = m.Service.EnableMFADevice(enableMFADeviceInput)
@@ -313,8 +311,7 @@ func main() {
 
 	// initialize things
 	user := User{
-		IAMUser: options.IAMUser,
-		Role:    options.Role,
+		Name: options.IAMUser,
 	}
 
 	profile := vault.Profile{
@@ -322,6 +319,11 @@ func main() {
 		RoleARN: fmt.Sprintf("arn:aws:iam::%v:role/%v",
 			options.AwsAccountID, options.Role),
 		Region: options.AwsRegion,
+	}
+
+	mfaManager := MFAManager{
+		User:    &user,
+		Profile: &profile,
 	}
 
 	config, err := vault.LoadConfigFromEnv()
@@ -343,11 +345,6 @@ func main() {
 	err = AddAWSVaultProfile(profile.Name, config)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	mfaManager := MFAManager{
-		User:    &user,
-		Profile: &profile,
 	}
 
 	err = mfaManager.CreateServiceSession()
