@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20191030013236-08380e6561cc
+	github.com/99designs/keyring v1.1.3
 	github.com/aws/aws-sdk-go v1.25.40
 	github.com/go-ini/ini v1.51.0 // indirect
 	github.com/jessevdk/go-flags v1.4.0
