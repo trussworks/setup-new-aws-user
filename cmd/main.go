@@ -43,62 +43,78 @@ func (c *cliOptions) validateProfileVars() error {
 
 // User holds information for the AWS user being configured by this script
 type User struct {
-	Name string
+	Name            string
+	Profile         *vault.Profile
+	AccessKeyID     string
+	SecretAccessKey string
 }
 
-// MFAManager handles the MFA setup for a user
-type MFAManager struct {
-	Service *iam.IAM
-	User    *User
-	Profile *vault.Profile
+func (u *User) PromptAccessCredentials() error {
+	accessKeyID, err := prompt.TerminalPrompt("Enter Access Key ID: ")
+	if err != nil {
+		return fmt.Errorf("error retrieving access key ID: %w", err)
+	}
+
+	secretKey, err := prompt.TerminalPrompt("Enter Secret Access Key: ")
+	if err != nil {
+		return fmt.Errorf("error retrieving secret access key: %w", err)
+	}
+
+	u.AccessKeyID = accessKeyID
+	u.SecretAccessKey = secretKey
+
+	err = SetCredentialEnvironmentVariables(accessKeyID, secretKey)
+	if err != nil {
+		return fmt.Errorf("unable to set credential environment variables: %w", err)
+	}
+
+	return nil
 }
 
-// CreateServiceSession initializes an IAM service session for a user. Set
-// the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables with
-// the user's temporary credentials before invoking this method.
-func (m *MFAManager) CreateServiceSession() error {
+func (u *User) NewIAMServiceSession() *iam.IAM {
 	log.Println("Create IAM service session")
 	sessionOpts := session.Options{
 		Config: aws.Config{
 			// Why aws.String(): https://github.com/aws/aws-sdk-go/issues/363
-			Region:                        aws.String(m.Profile.Region),
+			Region:                        aws.String(u.Profile.Region),
 			CredentialsChainVerboseErrors: aws.Bool(true),
 		},
 	}
 	sess, err := session.NewSessionWithOptions(sessionOpts)
 	if err != nil {
-		return fmt.Errorf("unable to create new session: %w", err)
+		log.Fatalf("unable to create new session: %s", err)
 	}
-	m.Service = iam.New(sess)
-	return nil
+	return iam.New(sess)
 }
 
 // CreateVirtualMFADevice creates the user's virtual MFA device and updates the
 // MFA serial in the profile field.
-func (m *MFAManager) CreateVirtualMFADevice() error {
+func (u *User) CreateVirtualMFADevice() error {
 	log.Println("Creating the virtual MFA device...")
 
+	svc := u.NewIAMServiceSession()
+
 	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
-		VirtualMFADeviceName: aws.String(m.User.Name),
+		VirtualMFADeviceName: aws.String(u.Name),
 	}
 
-	mfaDeviceOutput, err := m.Service.CreateVirtualMFADevice(mfaDeviceInput)
+	mfaDeviceOutput, err := svc.CreateVirtualMFADevice(mfaDeviceInput)
 	if err != nil {
 		return fmt.Errorf("unable to create virtual mfa: %w", err)
 	}
 
-	m.Profile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	u.Profile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
 
 	// For the QR code, create a string that encodes:
 	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#VirtualMFADevice
 	content := fmt.Sprintf("otpauth://totp/%s@%s?secret=%s",
 		*mfaDeviceInput.VirtualMFADeviceName,
-		m.Profile.Name,
+		u.Profile.Name,
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
-	err = m.PrintQRCode(content)
+	err = PrintQRCode(content)
 	if err != nil {
 		return fmt.Errorf("unable to print qr code: %w", err)
 	}
@@ -106,20 +122,10 @@ func (m *MFAManager) CreateVirtualMFADevice() error {
 	return nil
 }
 
-// PrintQRCode prints the payload string as a QR code to the terminal
-func (m *MFAManager) PrintQRCode(payload string) error {
-	q, err := qrcode.New(payload, qrcode.Medium)
-	if err != nil {
-		return fmt.Errorf("unable to create qr code: %w", err)
-	}
-	fmt.Println(q.ToSmallString(false))
-	return nil
-}
-
 // EnableVirtualMFADevice enables the user's MFA device
-func (m *MFAManager) EnableVirtualMFADevice() error {
+func (u *User) EnableVirtualMFADevice() error {
 	log.Println("Enabling the virtual mfa device")
-	if m.Profile.MFASerial == "" {
+	if u.Profile.MFASerial == "" {
 		return fmt.Errorf("profile mfa serial must be set")
 	}
 	// TODO:
@@ -138,14 +144,17 @@ func (m *MFAManager) EnableVirtualMFADevice() error {
 	if err != nil {
 		return fmt.Errorf("unable to read token: %w", err)
 	}
+
+	svc := u.NewIAMServiceSession()
+
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(authToken1),
 		AuthenticationCode2: aws.String(authToken2),
-		SerialNumber:        aws.String(m.Profile.MFASerial),
-		UserName:            aws.String(m.User.Name),
+		SerialNumber:        aws.String(u.Profile.MFASerial),
+		UserName:            aws.String(u.Name),
 	}
 
-	_, err = m.Service.EnableMFADevice(enableMFADeviceInput)
+	_, err = svc.EnableMFADevice(enableMFADeviceInput)
 	if err != nil {
 		return fmt.Errorf("unable to enable mfa device: %w", err)
 	}
@@ -242,21 +251,12 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 // SetCredentialEnvironmentVariables prompts the user for their temporary AWS
 // credentials and updates the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
 // environment variables.
-func SetCredentialEnvironmentVariables() error {
+func SetCredentialEnvironmentVariables(accessKeyID, secretKey string) error {
 	log.Println("Setting AWS credential environment variables")
-	accessKeyID, err := prompt.TerminalPrompt("Enter Access Key ID: ")
-	if err != nil {
-		return fmt.Errorf("error retrieving access key ID: %w", err)
-	}
 
-	err = os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID)
+	err := os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID)
 	if err != nil {
 		return err
-	}
-
-	secretKey, err := prompt.TerminalPrompt("Enter Secret Access Key: ")
-	if err != nil {
-		return fmt.Errorf("error retrieving secret access key: %w", err)
 	}
 
 	err = os.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
@@ -281,6 +281,16 @@ func UnsetCredentialEnvironmentVariables() error {
 		return err
 	}
 
+	return nil
+}
+
+// PrintQRCode prints the payload string as a QR code to the terminal
+func PrintQRCode(payload string) error {
+	q, err := qrcode.New(payload, qrcode.Medium)
+	if err != nil {
+		return fmt.Errorf("unable to create qr code: %w", err)
+	}
+	fmt.Println(q.ToSmallString(false))
 	return nil
 }
 
@@ -318,10 +328,6 @@ func main() {
 	}
 
 	// initialize things
-	user := User{
-		Name: options.IAMUser,
-	}
-
 	profile := vault.Profile{
 		Name: options.AwsProfile,
 		RoleARN: fmt.Sprintf("arn:aws:iam::%v:role/%v",
@@ -329,8 +335,8 @@ func main() {
 		Region: options.AwsRegion,
 	}
 
-	mfaManager := MFAManager{
-		User:    &user,
+	user := User{
+		Name:    options.IAMUser,
 		Profile: &profile,
 	}
 
@@ -345,7 +351,7 @@ func main() {
 		log.Fatalf("Profile already exists in aws config file: %s", profile.Name)
 	}
 
-	err = SetCredentialEnvironmentVariables()
+	err = user.PromptAccessCredentials()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -355,17 +361,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = mfaManager.CreateServiceSession()
+	err = user.CreateVirtualMFADevice()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = mfaManager.CreateVirtualMFADevice()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = mfaManager.EnableVirtualMFADevice()
+	err = user.EnableVirtualMFADevice()
 	if err != nil {
 		log.Fatal(err)
 	}
