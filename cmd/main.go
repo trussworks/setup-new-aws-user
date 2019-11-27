@@ -158,7 +158,7 @@ func (m *MFAManager) EnableVirtualMFADevice() error {
 // AWS_SECRET_ACCESS_KEY environment variable are already populated with the
 // user's temporary credentials.
 func AddAWSVaultProfile(profile string, awsConfig *vault.Config) error {
-	log.Println("Adding profile to AWS vault")
+	log.Println("Adding profile to aws-vault")
 	var accessKeyID, secretKey string
 
 	if accessKeyID = os.Getenv("AWS_ACCESS_KEY_ID"); accessKeyID == "" {
@@ -182,13 +182,26 @@ func AddAWSVaultProfile(profile string, awsConfig *vault.Config) error {
 
 	log.Printf("Added credentials to profile %q in vault\n", profile)
 
-	sessions, err := vault.NewKeyringSessions(*keyring, awsConfig)
+	err = deleteSession(profile, awsConfig, keyring)
 	if err != nil {
-		return fmt.Errorf("unable to create new keyring session: %w", err)
+		return fmt.Errorf("unable to delete session: %w", err)
 	}
 
-	if n, _ := sessions.Delete(profile); n > 0 {
-		fmt.Printf("Deleted %d existing sessions.\n", n)
+	return nil
+}
+
+// RemoveAWSVaultSession removes the aws-vault session for the given profile
+func RemoveAWSVaultSession(profile string, awsConfig *vault.Config) error {
+	log.Printf("Removing aws-vault session")
+
+	keyring, err := getKeyRing()
+	if err != nil {
+		return fmt.Errorf("unable to get keyring: %w", err)
+	}
+
+	err = deleteSession(profile, awsConfig, keyring)
+	if err != nil {
+		return fmt.Errorf("unable to delete session: %w", err)
 	}
 
 	return nil
@@ -211,6 +224,19 @@ func getKeyRing() (*keyring.Keyring, error) {
 	}
 
 	return &ring, nil
+}
+
+func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Keyring) error {
+	sessions, err := vault.NewKeyringSessions(*keyring, awsConfig)
+	if err != nil {
+		return fmt.Errorf("unable to create new keyring session: %w", err)
+	}
+
+	if n, _ := sessions.Delete(profile); n > 0 {
+		log.Printf("Deleted %d existing sessions.\n", n)
+	}
+
+	return nil
 }
 
 // SetCredentialEnvironmentVariables prompts the user for their temporary AWS
@@ -259,7 +285,7 @@ func UnsetCredentialEnvironmentVariables() error {
 }
 
 func rotateKeys() error {
-	log.Printf("Making subprocess call to rotate-aws-access-key")
+	log.Println("Rotating out the temporary AWS access keys...")
 
 	// TODO: I'm not sure exec.Command() supports subprocess interaction with the user
 	cmd := exec.Command("echo", "This would run rotate-aws-access-key") // TODO: use the real command
@@ -277,24 +303,6 @@ func rotateKeys() error {
 
 	return nil
 }
-
-// func removeAWSVaultSession() error {
-// 	log.Printf("Making subprocess call to aws-vault remove")
-// 	cmd := exec.Command("aws-vault", "remove", os.Getenv("AWS_PROFILE"), "--sessions-only")
-
-// 	stdout, err := cmd.StdoutPipe()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if err := cmd.Start(); err != nil {
-// 		return err
-// 	}
-
-// 	slurp, _ := ioutil.ReadAll(stdout)
-// 	fmt.Printf("%s", slurp)
-
-// 	return nil
-// }
 
 func main() {
 	// parse command line flags
@@ -373,9 +381,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// removeAWSVaultSession()
-
-	log.Println("Rotating out the temporary AWS access keys...")
+	err = RemoveAWSVaultSession(profile.Name, config)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	err = rotateKeys()
 	if err != nil {
