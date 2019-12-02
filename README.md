@@ -8,9 +8,21 @@ Installation instructions will go here.
 
 ## Usage
 
-Usage information will go here. Until then, an example can be found in the
-[legendary-waddle](https://github.com/trussworks/legendary-waddle/blob/master/docs/how-to/setup-new-user.md)
-repository.
+The script requires the following environment variables to be set:
+
+|Name|Description|
+|----|-----------|
+|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|
+|AWS_PROFILE|Alias for the account where this script is being run|
+|AWS_ID_PROFILE|Alias of the ID account for the organization|
+
+For testing purposes, set these variables in a .envrc.local file.
+
+For regular users, AWS_PROFILE and AWS_ID_PROFILE should be identical.
+
+Run the following command to execute the script:
+
+    go run cmd/main.go --role <ROLE> --iam_user <USER>
 
 ## Dev setup
 
