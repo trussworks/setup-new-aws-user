@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
+	"time"
 
 	"github.com/99designs/aws-vault/prompt"
 	"github.com/99designs/aws-vault/vault"
@@ -17,6 +16,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/skip2/go-qrcode"
 )
+
+const maxNumAccessKeys = 2
 
 type cliOptions struct {
 	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"region"`
@@ -162,6 +163,72 @@ func (u *User) EnableVirtualMFADevice() error {
 	return nil
 }
 
+func (u *User) RotateAccessKeys(config *vault.Config) error {
+	log.Println("Rotating AWS access keys")
+
+	// TODO: disable role_arn in config section
+	// defer reenable role_arn in config section
+
+	err := SetCredentialEnvironmentVariables(u.AccessKeyID, u.SecretAccessKey)
+	if err != nil {
+		return fmt.Errorf("unable to set environment variables: %w", err)
+	}
+
+	svc := u.NewIAMServiceSession()
+
+	listAccessKeysOutput, err := svc.ListAccessKeys(&iam.ListAccessKeysInput{
+		UserName: aws.String(u.Name),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to list access keys: %w", err)
+	}
+
+	// TODO: check for no access keys?
+
+	if len(listAccessKeysOutput.AccessKeyMetadata) == maxNumAccessKeys {
+		return fmt.Errorf("maximum of %v access keys have already been created for %s; delete your unused access key through the AWS console before trying again", maxNumAccessKeys, u.Name)
+	}
+
+	oldAccessKeyID := listAccessKeysOutput.AccessKeyMetadata[0].AccessKeyId
+
+	log.Println("Creating new access key")
+	newAccessKey, err := svc.CreateAccessKey(&iam.CreateAccessKeyInput{
+		UserName: aws.String(u.Name),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create new access key: %w", err)
+	}
+
+	newAccessKeyID := newAccessKey.AccessKey.AccessKeyId
+	newSecretAccessKey := newAccessKey.AccessKey.SecretAccessKey
+
+	err = SetCredentialEnvironmentVariables(*newAccessKeyID, *newSecretAccessKey)
+	if err != nil {
+		return fmt.Errorf("unable to set enviroment variables with new credentials: %w", err)
+	}
+
+	err = AddAWSVaultProfile(u.Profile.Name, config)
+	if err != nil {
+		return fmt.Errorf("unable to add new credentials to aws-vault profile: %w", err)
+	}
+
+	log.Println("Sleeping....")
+	time.Sleep(30 * time.Second)
+
+	svc = u.NewIAMServiceSession()
+
+	log.Println("Deleting old access key")
+	_, err = svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+		AccessKeyId: oldAccessKeyID,
+		UserName:    aws.String(u.Name),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to delete old access key: %w", err)
+	}
+
+	return nil
+}
+
 // AddAWSVaultProfile uses aws-vault to store AWS credentials for the given
 // profile. The function assumes the AWS_ACCESS_KEY_ID and
 // AWS_SECRET_ACCESS_KEY environment variable are already populated with the
@@ -294,26 +361,6 @@ func PrintQRCode(payload string) error {
 	return nil
 }
 
-func rotateKeys() error {
-	log.Println("Rotating out the temporary AWS access keys...")
-
-	// TODO: I'm not sure exec.Command() supports subprocess interaction with the user
-	cmd := exec.Command("echo", "This would run rotate-aws-access-key") // TODO: use the real command
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	slurp, _ := ioutil.ReadAll(stdout)
-	fmt.Printf("%s", slurp)
-
-	return nil
-}
-
 func main() {
 	// parse command line flags
 	var options cliOptions
@@ -387,11 +434,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = rotateKeys()
+	err = user.RotateAccessKeys(config)
 	if err != nil {
 		log.Fatal(err)
-	} else {
-		log.Println("Success!")
 	}
 
 	// If we got this far, we win
