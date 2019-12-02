@@ -50,6 +50,8 @@ type User struct {
 	SecretAccessKey string
 }
 
+// PromptAccessCredentials prompts the user for their AWS access key ID and
+// secret access key, and sets the corresponding environment variables.
 func (u *User) PromptAccessCredentials() error {
 	accessKeyID, err := prompt.TerminalPrompt("Enter Access Key ID: ")
 	if err != nil {
@@ -72,7 +74,7 @@ func (u *User) PromptAccessCredentials() error {
 	return nil
 }
 
-func (u *User) NewIAMServiceSession() *iam.IAM {
+func (u *User) newIAMServiceSession() *iam.IAM {
 	log.Println("Create IAM service session")
 	sessionOpts := session.Options{
 		Config: aws.Config{
@@ -93,7 +95,7 @@ func (u *User) NewIAMServiceSession() *iam.IAM {
 func (u *User) CreateVirtualMFADevice() error {
 	log.Println("Creating the virtual MFA device...")
 
-	svc := u.NewIAMServiceSession()
+	svc := u.newIAMServiceSession()
 
 	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
 		VirtualMFADeviceName: aws.String(u.Name),
@@ -146,7 +148,7 @@ func (u *User) EnableVirtualMFADevice() error {
 		return fmt.Errorf("unable to read token: %w", err)
 	}
 
-	svc := u.NewIAMServiceSession()
+	svc := u.newIAMServiceSession()
 
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(authToken1),
@@ -163,18 +165,16 @@ func (u *User) EnableVirtualMFADevice() error {
 	return nil
 }
 
+// RotateAccessKeys rotates the user's AWS access key.
 func (u *User) RotateAccessKeys(config *vault.Config) error {
 	log.Println("Rotating AWS access keys")
-
-	// TODO: disable role_arn in config section
-	// defer reenable role_arn in config section
 
 	err := SetCredentialEnvironmentVariables(u.AccessKeyID, u.SecretAccessKey)
 	if err != nil {
 		return fmt.Errorf("unable to set environment variables: %w", err)
 	}
 
-	svc := u.NewIAMServiceSession()
+	svc := u.newIAMServiceSession()
 
 	listAccessKeysOutput, err := svc.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: aws.String(u.Name),
@@ -182,8 +182,6 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 	if err != nil {
 		return fmt.Errorf("unable to list access keys: %w", err)
 	}
-
-	// TODO: check for no access keys?
 
 	if len(listAccessKeysOutput.AccessKeyMetadata) == maxNumAccessKeys {
 		return fmt.Errorf("maximum of %v access keys have already been created for %s; delete your unused access key through the AWS console before trying again", maxNumAccessKeys, u.Name)
@@ -212,10 +210,12 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 		return fmt.Errorf("unable to add new credentials to aws-vault profile: %w", err)
 	}
 
+	// Add a delay to allow the new IAM credentials to propagate.
+	// TODO: replace this with a retry similar to https://github.com/99designs/aws-vault/blob/08380e6561cc885491717ed2dce164ea6076c438/vault/rotator.go#L197
 	log.Println("Sleeping....")
 	time.Sleep(30 * time.Second)
 
-	svc = u.NewIAMServiceSession()
+	svc = u.newIAMServiceSession()
 
 	log.Println("Deleting old access key")
 	_, err = svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
@@ -232,7 +232,7 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 // AddAWSVaultProfile uses aws-vault to store AWS credentials for the given
 // profile. The function assumes the AWS_ACCESS_KEY_ID and
 // AWS_SECRET_ACCESS_KEY environment variable are already populated with the
-// user's temporary credentials.
+// user's credentials.
 func AddAWSVaultProfile(profile string, awsConfig *vault.Config) error {
 	log.Println("Adding profile to aws-vault")
 	var accessKeyID, secretKey string
@@ -315,9 +315,8 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-// SetCredentialEnvironmentVariables prompts the user for their temporary AWS
-// credentials and updates the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-// environment variables.
+// SetCredentialEnvironmentVariables updates the AWS_ACCESS_KEY_ID and
+// AWS_SECRET_ACCESS_KEY environment variables.
 func SetCredentialEnvironmentVariables(accessKeyID, secretKey string) error {
 	log.Println("Setting AWS credential environment variables")
 
@@ -392,10 +391,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Checking whether profile exists in aws config file")
+	log.Println("Checking whether profile exists in AWS config file")
 	_, exists := config.Profile(profile.Name)
 	if exists {
-		log.Fatalf("Profile already exists in aws config file: %s", profile.Name)
+		log.Fatalf("Profile already exists in AWS config file: %s", profile.Name)
 	}
 
 	err = user.PromptAccessCredentials()
