@@ -169,11 +169,6 @@ func (u *User) EnableVirtualMFADevice() error {
 	if u.Profile.MFASerial == "" {
 		return fmt.Errorf("profile mfa serial must be set")
 	}
-	// TODO:
-	// - Check that the device is correct by polling ListVirtualMFADevices with
-	//   assignment status "Assigned"
-	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.EnableVirtualMFADevice
-	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.ListVirtualMFADevices
 
 	mfaTokenPair := getMFATokenPair()
 
