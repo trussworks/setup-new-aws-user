@@ -21,6 +21,8 @@ import (
 const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
+var validate *validator.Validate
+
 // MFATokenPair holds two MFA tokens for enabling virtual
 // MFA device
 type MFATokenPair struct {
@@ -31,24 +33,12 @@ type MFATokenPair struct {
 type cliOptions struct {
 	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"region"`
 	AwsAccountID   int    `required:"true" env:"AWS_ACCOUNT_ID" long:"account_id" description:"account id"`
-	AwsProfile     string `required:"true" env:"AWS_PROFILE" long:"profile" description:"profile name"`
+	AwsProfile     string `required:"true" env:"AWS_PROFILE" long:"profile" description:"profile name" validate:"eqfield=AwsIDProfile|eqfield=AwsRootProfile"`
 	AwsIDProfile   string `required:"true" env:"AWS_ID_PROFILE" long:"id_profile" description:"id profile name"`
 	AwsRootProfile string `env:"AWS_ROOT_PROFILE" long:"root_profile" description:"root profile name"`
 	IAMUser        string `required:"true" env:"" long:"iam_user" description:"iam user name"`
 	Role           string `required:"true" long:"role" choice:"admin-org-root" choice:"engineer" choice:"admin" description:"user role type"`
 	Output         string `long:"output" default:"json" description:"aws-cli output format"`
-}
-
-func (c *cliOptions) validateProfileVars() error {
-	log.Println("Validating profile variables")
-	if c.AwsProfile != c.AwsRootProfile && c.AwsProfile != c.AwsIDProfile {
-		return fmt.Errorf("found AWS_PROFILE=%q, expecting AWS_PROFILE to match AWS_ROOT_PROFILE (%q) or AWS_ID_PROFILE (%q); there are no users in other accounts, just roles",
-			c.AwsProfile,
-			c.AwsRootProfile,
-			c.AwsIDProfile,
-		)
-	}
-	return nil
 }
 
 // User holds information for the AWS user being configured by this script
@@ -136,7 +126,6 @@ func (u *User) CreateVirtualMFADevice() error {
 
 func promptMFAtoken(message string) string {
 	var token string
-	validate := validator.New()
 	for attempts := maxMFATokenPromptAttempts; token == "" && attempts > 0; attempts-- {
 		t, err := prompt.TerminalPrompt(fmt.Sprintf("%s MFA token (%d attempts remaining): ", message, attempts))
 		if err != nil {
@@ -155,7 +144,6 @@ func promptMFAtoken(message string) string {
 
 func getMFATokenPair() MFATokenPair {
 	var mfaTokenPair MFATokenPair
-	validate := validator.New()
 	for attempts := maxMFATokenPromptAttempts; attempts > 0; attempts-- {
 		fmt.Printf("Two unique MFA tokens needed to activate MFA device (%d attempts remaining)\n", attempts)
 		authToken1 := promptMFAtoken("First")
@@ -409,7 +397,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = options.validateProfileVars()
+	validate = validator.New()
+	err = validate.Struct(options)
 	if err != nil {
 		log.Fatal(err)
 	}
