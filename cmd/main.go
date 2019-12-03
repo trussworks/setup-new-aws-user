@@ -15,9 +15,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/jessevdk/go-flags"
 	"github.com/skip2/go-qrcode"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 const maxNumAccessKeys = 2
+const maxMFATokenPromptAttempts = 5
+
+// MFATokenPair holds two MFA tokens for enabling virtual
+// MFA device
+type MFATokenPair struct {
+	Token1 string `validate:"numeric,len=6"`
+	Token2 string `validate:"numeric,len=6,nefield=Token1"`
+}
 
 type cliOptions struct {
 	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"region"`
@@ -125,6 +134,47 @@ func (u *User) CreateVirtualMFADevice() error {
 	return nil
 }
 
+func promptMFAtoken(message string) string {
+	var token string
+	validate := validator.New()
+	for attempts := maxMFATokenPromptAttempts; token == "" && attempts > 0; attempts-- {
+		t, err := prompt.TerminalPrompt(fmt.Sprintf("%s MFA token (%d attempts remaining): ", message, attempts))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		err = validate.Var(t, "numeric,len=6")
+		if err != nil {
+			fmt.Println("MFA token must be 6 digits. Please try again.")
+			continue
+		}
+		token = t
+	}
+	return token
+}
+
+func getMFATokenPair() MFATokenPair {
+	var mfaTokenPair MFATokenPair
+	validate := validator.New()
+	for attempts := maxMFATokenPromptAttempts; attempts > 0; attempts-- {
+		fmt.Printf("Two unique MFA tokens needed to activate MFA device (%d attempts remaining)\n", attempts)
+		authToken1 := promptMFAtoken("First")
+		authToken2 := promptMFAtoken("Second")
+
+		mfaTokenPair = MFATokenPair{
+			Token1: authToken1,
+			Token2: authToken2,
+		}
+		err := validate.Struct(mfaTokenPair)
+		if err != nil {
+			log.Println(err)
+		} else {
+			break
+		}
+	}
+	return mfaTokenPair
+}
+
 // EnableVirtualMFADevice enables the user's MFA device
 func (u *User) EnableVirtualMFADevice() error {
 	log.Println("Enabling the virtual mfa device")
@@ -132,32 +182,23 @@ func (u *User) EnableVirtualMFADevice() error {
 		return fmt.Errorf("profile mfa serial must be set")
 	}
 	// TODO:
-	// - Validate that the tokens are 6 character integers & store them so they
-	//   can't be reused
 	// - Check that the device is correct by polling ListVirtualMFADevices with
 	//   assignment status "Assigned"
 	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.EnableVirtualMFADevice
 	//	https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#IAM.ListVirtualMFADevices
 
-	authToken1, err := prompt.TerminalPrompt("First MFA token: ")
-	if err != nil {
-		return fmt.Errorf("unable to read token: %w", err)
-	}
-	authToken2, err := prompt.TerminalPrompt("Second MFA token: ")
-	if err != nil {
-		return fmt.Errorf("unable to read token: %w", err)
-	}
+	mfaTokenPair := getMFATokenPair()
 
 	svc := u.newIAMServiceSession()
 
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
-		AuthenticationCode1: aws.String(authToken1),
-		AuthenticationCode2: aws.String(authToken2),
+		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
+		AuthenticationCode2: aws.String(mfaTokenPair.Token2),
 		SerialNumber:        aws.String(u.Profile.MFASerial),
 		UserName:            aws.String(u.Name),
 	}
 
-	_, err = svc.EnableMFADevice(enableMFADeviceInput)
+	_, err := svc.EnableMFADevice(enableMFADeviceInput)
 	if err != nil {
 		return fmt.Errorf("unable to enable mfa device: %w", err)
 	}
