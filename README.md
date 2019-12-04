@@ -14,7 +14,6 @@ The script requires the following environment variables to be set:
 |----|-----------|
 |AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|
 |AWS_PROFILE|Alias for the account where this script is being run|
-|AWS_ID_PROFILE|Alias of the ID account for the organization|
 
 For testing purposes, set these variables in a .envrc.local file.
 
