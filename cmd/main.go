@@ -31,14 +31,12 @@ type MFATokenPair struct {
 }
 
 type cliOptions struct {
-	AwsRegion      string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"The AWS region"`
-	AwsAccountID   int    `required:"true" env:"AWS_ACCOUNT_ID" long:"account-id" description:"The AWS account number"`
-	AwsProfile     string `required:"true" env:"AWS_PROFILE" long:"profile" description:"The AWS profile name"`
-	AwsIDProfile   string `env:"AWS_ID_PROFILE" long:"id-profile" description:"The AWS ID profile name"`
-	AwsRootProfile string `env:"AWS_ROOT_PROFILE" long:"root-profile" description:"The AWS root profile name"`
-	IAMUser        string `required:"true" long:"iam-user" description:"The IAM user name"`
-	Role           string `required:"true" long:"role" description:"The user role type"`
-	Output         string `long:"output" default:"json" description:"The AWS CLI output format"`
+	AwsRegion    string `env:"AWS_REGION" long:"region" default:"us-west-2" description:"The AWS region"`
+	AwsAccountID int    `required:"true" env:"AWS_ACCOUNT_ID" long:"account-id" description:"The AWS account number"`
+	AwsProfile   string `required:"true" env:"AWS_PROFILE" long:"profile" description:"The AWS profile name"`
+	IAMUser      string `required:"true" long:"iam-user" description:"The IAM user name"`
+	Role         string `required:"true" long:"role" description:"The user role type"`
+	Output       string `long:"output" default:"json" description:"The AWS CLI output format"`
 }
 
 // User holds information for the AWS user being configured by this script
