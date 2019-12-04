@@ -1,4 +1,0 @@
-issues:
-  exclude:
-    - SA5008 # exclude SA5008: duplicate struct tag "choice"
-             # which causes issue with go-flags
