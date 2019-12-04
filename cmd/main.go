@@ -234,23 +234,44 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 		return fmt.Errorf("unable to add new credentials to aws-vault profile: %w", err)
 	}
 
-	// Add a delay to allow the new IAM credentials to propagate.
-	// TODO: replace this with a retry similar to https://github.com/99designs/aws-vault/blob/08380e6561cc885491717ed2dce164ea6076c438/vault/rotator.go#L197
-	log.Println("Sleeping....")
-	time.Sleep(30 * time.Second)
-
+	log.Println("Deleting old access key (may take several attempts for new credentials to propagate)...")
 	svc = u.newIAMServiceSession()
-
-	log.Println("Deleting old access key")
-	_, err = svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
-		AccessKeyId: oldAccessKeyID,
-		UserName:    aws.String(u.Name),
+	err = retry(time.Second*60, time.Second*5, func() error {
+		_, err = svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+			AccessKeyId: oldAccessKeyID,
+			UserName:    aws.String(u.Name),
+		})
+		return err
 	})
+
 	if err != nil {
 		return fmt.Errorf("unable to delete old access key: %w", err)
 	}
 
 	return nil
+}
+
+// retry function borrows from aws-vault rotator code
+// https://github.com/99designs/aws-vault/blob/v4.7.1/vault/rotator.go
+func retry(duration time.Duration, sleep time.Duration, callback func() error) (err error) {
+	t0 := time.Now()
+	i := 0
+	for {
+		i++
+
+		log.Printf("Attempt #%d\n", i)
+		err = callback()
+		if err == nil {
+			return
+		}
+
+		delta := time.Since(t0)
+		if delta > duration {
+			return fmt.Errorf("After %d attempts (during %s), last error: %s", i, delta, err)
+		}
+
+		time.Sleep(sleep)
+	}
 }
 
 // AddAWSVaultProfile uses aws-vault to store AWS credentials for the given
