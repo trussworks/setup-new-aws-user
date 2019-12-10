@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/99designs/aws-vault/prompt"
 	"github.com/99designs/aws-vault/vault"
@@ -13,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/jessevdk/go-flags"
 	"github.com/skip2/go-qrcode"
 	"gopkg.in/go-playground/validator.v9"
@@ -43,12 +43,54 @@ type cliOptions struct {
 type User struct {
 	Name            string
 	Profile         *vault.Profile
+	Config          *vault.Config
 	AccessKeyID     string
 	SecretAccessKey string
 }
 
+// Setup orchestrates the tasks to create the user's MFA and rotate access
+// keys.
+func (u *User) Setup() {
+	err := u.PromptAccessCredentials()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = u.AddVaultProfile()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = u.CreateVirtualMFADevice()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = u.EnableVirtualMFADevice()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Updating the AWS config file")
+	err = u.Config.Add(*u.Profile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = u.RemoveVaultSession()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = u.RotateAccessKeys()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
+
 // PromptAccessCredentials prompts the user for their AWS access key ID and
-// secret access key, and sets the corresponding environment variables.
+// secret access key.
 func (u *User) PromptAccessCredentials() error {
 	accessKeyID, err := prompt.TerminalPrompt("Enter Access Key ID: ")
 	if err != nil {
@@ -63,28 +105,53 @@ func (u *User) PromptAccessCredentials() error {
 	u.AccessKeyID = accessKeyID
 	u.SecretAccessKey = secretKey
 
-	err = SetCredentialEnvironmentVariables(accessKeyID, secretKey)
-	if err != nil {
-		return fmt.Errorf("unable to set credential environment variables: %w", err)
-	}
-
 	return nil
 }
 
-func (u *User) newIAMServiceSession() *iam.IAM {
-	log.Println("Create IAM service session")
-	sessionOpts := session.Options{
+func (u *User) newSession() (*session.Session, error) {
+	sess, err := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
-			// Why aws.String(): https://github.com/aws/aws-sdk-go/issues/363
-			Region:                        aws.String(u.Profile.Region),
-			CredentialsChainVerboseErrors: aws.Bool(true),
+			Credentials: credentials.NewStaticCredentialsFromCreds(credentials.Value{
+				AccessKeyID:     u.AccessKeyID,
+				SecretAccessKey: u.SecretAccessKey,
+			}),
+			Region: aws.String(u.Profile.Region),
 		},
-	}
-	sess, err := session.NewSessionWithOptions(sessionOpts)
+	})
 	if err != nil {
-		log.Fatalf("unable to create new session: %s", err)
+		return nil, fmt.Errorf("unable to create new session: %w", err)
 	}
-	return iam.New(sess)
+	return sess, nil
+}
+
+func (u *User) newMFASession() (*session.Session, error) {
+	mfaToken := promptMFAtoken("")
+	basicSession, err := u.newSession()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create new session: %w", err)
+	}
+	stsClient := sts.New(basicSession)
+	getSessionTokenOutput, err := stsClient.GetSessionToken(&sts.GetSessionTokenInput{
+		SerialNumber: aws.String(u.Profile.MFASerial),
+		TokenCode:    aws.String(mfaToken),
+	})
+	if err != nil {
+		log.Fatalf("unable to get session token: %v", err)
+	}
+	mfaSession, err := session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			Credentials: credentials.NewStaticCredentialsFromCreds(credentials.Value{
+				AccessKeyID:     *getSessionTokenOutput.Credentials.AccessKeyId,
+				SecretAccessKey: *getSessionTokenOutput.Credentials.SecretAccessKey,
+				SessionToken:    *getSessionTokenOutput.Credentials.SessionToken,
+			}),
+			Region: aws.String(u.Profile.Region),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to get mfa session: %w", err)
+	}
+	return mfaSession, nil
 }
 
 // CreateVirtualMFADevice creates the user's virtual MFA device and updates the
@@ -92,7 +159,11 @@ func (u *User) newIAMServiceSession() *iam.IAM {
 func (u *User) CreateVirtualMFADevice() error {
 	log.Println("Creating the virtual MFA device...")
 
-	svc := u.newIAMServiceSession()
+	sess, err := u.newSession()
+	if err != nil {
+		return fmt.Errorf("unable to get new session: %w", err)
+	}
+	svc := iam.New(sess)
 
 	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
 		VirtualMFADeviceName: aws.String(u.Name),
@@ -114,7 +185,7 @@ func (u *User) CreateVirtualMFADevice() error {
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
-	err = PrintQRCode(content)
+	err = printQRCode(content)
 	if err != nil {
 		return fmt.Errorf("unable to print qr code: %w", err)
 	}
@@ -122,10 +193,10 @@ func (u *User) CreateVirtualMFADevice() error {
 	return nil
 }
 
-func promptMFAtoken(message string) string {
+func promptMFAtoken(messagePrefix string) string {
 	var token string
 	for attempts := maxMFATokenPromptAttempts; token == "" && attempts > 0; attempts-- {
-		t, err := prompt.TerminalPrompt(fmt.Sprintf("%s MFA token (%d attempts remaining): ", message, attempts))
+		t, err := prompt.TerminalPrompt(fmt.Sprintf("%sMFA token (%d attempts remaining): ", messagePrefix, attempts))
 		if err != nil {
 			log.Println(err)
 			continue
@@ -144,8 +215,8 @@ func getMFATokenPair() MFATokenPair {
 	var mfaTokenPair MFATokenPair
 	for attempts := maxMFATokenPromptAttempts; attempts > 0; attempts-- {
 		fmt.Printf("Two unique MFA tokens needed to activate MFA device (%d attempts remaining)\n", attempts)
-		authToken1 := promptMFAtoken("First")
-		authToken2 := promptMFAtoken("Second")
+		authToken1 := promptMFAtoken("First ")
+		authToken2 := promptMFAtoken("Second ")
 
 		mfaTokenPair = MFATokenPair{
 			Token1: authToken1,
@@ -170,7 +241,11 @@ func (u *User) EnableVirtualMFADevice() error {
 
 	mfaTokenPair := getMFATokenPair()
 
-	svc := u.newIAMServiceSession()
+	sess, err := u.newSession()
+	if err != nil {
+		return fmt.Errorf("unable to get new session: %w", err)
+	}
+	svc := iam.New(sess)
 
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
@@ -179,7 +254,7 @@ func (u *User) EnableVirtualMFADevice() error {
 		UserName:            aws.String(u.Name),
 	}
 
-	_, err := svc.EnableMFADevice(enableMFADeviceInput)
+	_, err = svc.EnableMFADevice(enableMFADeviceInput)
 	if err != nil {
 		return fmt.Errorf("unable to enable mfa device: %w", err)
 	}
@@ -188,17 +263,15 @@ func (u *User) EnableVirtualMFADevice() error {
 }
 
 // RotateAccessKeys rotates the user's AWS access key.
-func (u *User) RotateAccessKeys(config *vault.Config) error {
+func (u *User) RotateAccessKeys() error {
 	log.Println("Rotating AWS access keys")
 
-	err := SetCredentialEnvironmentVariables(u.AccessKeyID, u.SecretAccessKey)
+	sess, err := u.newMFASession()
 	if err != nil {
-		return fmt.Errorf("unable to set environment variables: %w", err)
+		return fmt.Errorf("unable to get mfa session: %w", err)
 	}
-
-	svc := u.newIAMServiceSession()
-
-	listAccessKeysOutput, err := svc.ListAccessKeys(&iam.ListAccessKeysInput{
+	iamClient := iam.New(sess)
+	listAccessKeysOutput, err := iamClient.ListAccessKeys(&iam.ListAccessKeysInput{
 		UserName: aws.String(u.Name),
 	})
 	if err != nil {
@@ -212,34 +285,25 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 	oldAccessKeyID := listAccessKeysOutput.AccessKeyMetadata[0].AccessKeyId
 
 	log.Println("Creating new access key")
-	newAccessKey, err := svc.CreateAccessKey(&iam.CreateAccessKeyInput{
+	newAccessKey, err := iamClient.CreateAccessKey(&iam.CreateAccessKeyInput{
 		UserName: aws.String(u.Name),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create new access key: %w", err)
 	}
 
-	newAccessKeyID := newAccessKey.AccessKey.AccessKeyId
-	newSecretAccessKey := newAccessKey.AccessKey.SecretAccessKey
+	u.AccessKeyID = *newAccessKey.AccessKey.AccessKeyId
+	u.SecretAccessKey = *newAccessKey.AccessKey.SecretAccessKey
 
-	err = SetCredentialEnvironmentVariables(*newAccessKeyID, *newSecretAccessKey)
-	if err != nil {
-		return fmt.Errorf("unable to set enviroment variables with new credentials: %w", err)
-	}
-
-	err = AddAWSVaultProfile(u.Profile.Name, config)
+	err = u.AddVaultProfile()
 	if err != nil {
 		return fmt.Errorf("unable to add new credentials to aws-vault profile: %w", err)
 	}
 
-	log.Println("Deleting old access key (may take several attempts for new credentials to propagate)...")
-	svc = u.newIAMServiceSession()
-	err = retry(time.Second*60, time.Second*5, func() error {
-		_, err = svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
-			AccessKeyId: oldAccessKeyID,
-			UserName:    aws.String(u.Name),
-		})
-		return err
+	log.Println("Deleting old access key")
+	_, err = iamClient.DeleteAccessKey(&iam.DeleteAccessKeyInput{
+		AccessKeyId: oldAccessKeyID,
+		UserName:    aws.String(u.Name),
 	})
 
 	if err != nil {
@@ -249,59 +313,24 @@ func (u *User) RotateAccessKeys(config *vault.Config) error {
 	return nil
 }
 
-// retry function borrows from aws-vault rotator code
-// https://github.com/99designs/aws-vault/blob/v4.7.1/vault/rotator.go
-func retry(duration time.Duration, sleep time.Duration, callback func() error) (err error) {
-	t0 := time.Now()
-	i := 0
-	for {
-		i++
-
-		log.Printf("Attempt #%d\n", i)
-		err = callback()
-		if err == nil {
-			return
-		}
-
-		delta := time.Since(t0)
-		if delta > duration {
-			return fmt.Errorf("After %d attempts (during %s), last error: %s", i, delta, err)
-		}
-
-		time.Sleep(sleep)
-	}
-}
-
-// AddAWSVaultProfile uses aws-vault to store AWS credentials for the given
-// profile. The function assumes the AWS_ACCESS_KEY_ID and
-// AWS_SECRET_ACCESS_KEY environment variable are already populated with the
-// user's credentials.
-func AddAWSVaultProfile(profile string, awsConfig *vault.Config) error {
-	log.Println("Adding profile to aws-vault")
-	var accessKeyID, secretKey string
-
-	if accessKeyID = os.Getenv("AWS_ACCESS_KEY_ID"); accessKeyID == "" {
-		return fmt.Errorf("Missing value for AWS_ACCESS_KEY_ID")
-	}
-	if secretKey = os.Getenv("AWS_SECRET_ACCESS_KEY"); secretKey == "" {
-		return fmt.Errorf("Missing value for AWS_SECRET_ACCESS_KEY")
-	}
-
+// AddVaultProfile uses aws-vault to store AWS credentials for the user's
+// profile.
+func (u *User) AddVaultProfile() error {
 	keyring, err := getKeyRing()
 	if err != nil {
 		return fmt.Errorf("unable to get keyring: %w", err)
 	}
 
-	creds := credentials.Value{AccessKeyID: accessKeyID, SecretAccessKey: secretKey}
-	provider := &vault.KeyringProvider{Keyring: *keyring, Profile: profile}
+	creds := credentials.Value{AccessKeyID: u.AccessKeyID, SecretAccessKey: u.SecretAccessKey}
+	provider := &vault.KeyringProvider{Keyring: *keyring, Profile: u.Profile.Name}
 
 	if err := provider.Store(creds); err != nil {
 		return fmt.Errorf("unable to store credentials: %w", err)
 	}
 
-	log.Printf("Added credentials to profile %q in vault\n", profile)
+	log.Printf("Added credentials to profile %q in vault\n", u.Profile.Name)
 
-	err = deleteSession(profile, awsConfig, keyring)
+	err = deleteSession(u.Profile.Name, u.Config, keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -309,8 +338,8 @@ func AddAWSVaultProfile(profile string, awsConfig *vault.Config) error {
 	return nil
 }
 
-// RemoveAWSVaultSession removes the aws-vault session for the given profile
-func RemoveAWSVaultSession(profile string, awsConfig *vault.Config) error {
+// RemoveVaultSession removes the aws-vault session for the profile.
+func (u *User) RemoveVaultSession() error {
 	log.Printf("Removing aws-vault session")
 
 	keyring, err := getKeyRing()
@@ -318,7 +347,7 @@ func RemoveAWSVaultSession(profile string, awsConfig *vault.Config) error {
 		return fmt.Errorf("unable to get keyring: %w", err)
 	}
 
-	err = deleteSession(profile, awsConfig, keyring)
+	err = deleteSession(u.Profile.Name, u.Config, keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -358,43 +387,7 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-// SetCredentialEnvironmentVariables updates the AWS_ACCESS_KEY_ID and
-// AWS_SECRET_ACCESS_KEY environment variables.
-func SetCredentialEnvironmentVariables(accessKeyID, secretKey string) error {
-	log.Println("Setting AWS credential environment variables")
-
-	err := os.Setenv("AWS_ACCESS_KEY_ID", accessKeyID)
-	if err != nil {
-		return err
-	}
-
-	err = os.Setenv("AWS_SECRET_ACCESS_KEY", secretKey)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// UnsetCredentialEnvironmentVariables unsets the AWS_ACCESS_KEY_ID and
-// AWS_SECRET_ACCESS_KEY environment variables.
-func UnsetCredentialEnvironmentVariables() error {
-	log.Println("Unsetting AWS credential environment variables")
-	err := os.Unsetenv("AWS_ACCESS_KEY_ID")
-	if err != nil {
-		return err
-	}
-
-	err = os.Unsetenv("AWS_SECRET_ACCESS_KEY")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// PrintQRCode prints the payload string as a QR code to the terminal
-func PrintQRCode(payload string) error {
+func printQRCode(payload string) error {
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
 		return fmt.Errorf("unable to create qr code: %w", err)
@@ -422,11 +415,6 @@ func main() {
 		Region: options.AwsRegion,
 	}
 
-	user := User{
-		Name:    options.IAMUser,
-		Profile: &profile,
-	}
-
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
 		log.Fatal(err)
@@ -438,46 +426,13 @@ func main() {
 		log.Fatalf("Profile already exists in AWS config file: %s", profile.Name)
 	}
 
-	err = user.PromptAccessCredentials()
-	if err != nil {
-		log.Fatal(err)
+	user := User{
+		Name:    options.IAMUser,
+		Profile: &profile,
+		Config:  config,
 	}
 
-	err = AddAWSVaultProfile(profile.Name, config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = user.CreateVirtualMFADevice()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = user.EnableVirtualMFADevice()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Updating the AWS config file")
-	err = config.Add(profile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = UnsetCredentialEnvironmentVariables()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = RemoveAWSVaultSession(profile.Name, config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = user.RotateAccessKeys(config)
-	if err != nil {
-		log.Fatal(err)
-	}
+	user.Setup()
 
 	// If we got this far, we win
 	log.Println("Victory!")
