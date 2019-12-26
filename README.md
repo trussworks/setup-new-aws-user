@@ -35,10 +35,10 @@ Create an entry in your 1Password account with a One Time Password (OTP)
 field and be ready to scan it with the 1Password app.
 Currently works only with mobile app.
 
-- **NOTE** You will be asked for your MFA (TOTP) tokens four times while
+- **NOTE** You will be asked for your MFA (TOTP) tokens three times while
 validating the new virtual MFA device and rotating your access keys.
-Take care not to use the same token
-more than once, as this will cause the process to fail.
+**Take care not to use the same token
+more than once**, as this will cause the process to fail.
 
 ## Dev setup
 
