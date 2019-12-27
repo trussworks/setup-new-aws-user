@@ -10,18 +10,35 @@ Installation instructions will go here.
 
 The script requires the following environment variables to be set:
 
-|Name|Description|
-|----|-----------|
-|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|
-|AWS_PROFILE|Alias for the account where this script is being run|
+|Name|Description|Example
+|----|-----------|---------|
+|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|`123456789012`
+|AWS_PROFILE|Alias for the account where this script is being run|`trussworks-id`
 
-For testing purposes, set these variables in a .envrc.local file.
+For testing purposes, set the above variables in a .envrc.local file.
 
-For regular users, AWS_PROFILE and AWS_ID_PROFILE should be identical.
+### Setup new IAM user
 
-Run the following command to execute the script:
+1. Have admin user run through
+[these instructions](https://github.com/trussworks/legendary-waddle/blob/master/docs/how-to/setup-new-user.md#existing-admin-user-does-this)
+in legendary-waddle repo to generate access keys.
+1. Set `AWS_ACCOUNT_ID` and `AWS_PROFILE` variables in one of three ways:
+    - Save to an .envrc.local file
+    - Set them as local environment variables on your terminal, or
+    - Pass them through as flags when you run this script
+    (i.e.
+    `go run cmd/main.go --role <ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`)
+1. Run the setup-new-user script: `go run cmd/main.go --role <ROLE> --iam_user <USER>`
+1. Enter the access keys generated when prompted.
+1. The script will display a QR code for an MFA device at some point.
+Create an entry in your 1Password account with a One Time Password (OTP)
+field and be ready to scan it with the 1Password app.
+Currently works only with mobile app.
 
-    go run cmd/main.go --role <ROLE> --iam_user <USER>
+- **NOTE** You will be asked for your MFA (TOTP) tokens three times while
+validating the new virtual MFA device and rotating your access keys.
+**Take care not to use the same token
+more than once**, as this will cause the process to fail.
 
 ## Dev setup
 
