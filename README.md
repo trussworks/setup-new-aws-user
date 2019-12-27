@@ -12,7 +12,7 @@ The script requires the following environment variables to be set:
 
 |Name|Description|Example
 |----|-----------|---------|
-|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|`180556216494`
+|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|`123456789012`
 |AWS_PROFILE|Alias for the account where this script is being run|`trussworks-id`
 
 For testing purposes, set the above variables in a .envrc.local file.
