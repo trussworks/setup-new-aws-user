@@ -1,6 +1,8 @@
 ---
 default: true
-line_length: true
+line_length:
+  line_length: true
+  code_blocks: false
 no-duplicate-header:
   siblings_only: true
 commands-show-output: false

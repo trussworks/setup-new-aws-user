@@ -16,6 +16,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/skip2/go-qrcode"
 	"gopkg.in/go-playground/validator.v9"
+	"gopkg.in/ini.v1"
 )
 
 const maxNumAccessKeys = 2
@@ -43,6 +44,7 @@ type cliOptions struct {
 type User struct {
 	Name            string
 	Profile         *vault.Profile
+	Output          string
 	Config          *vault.Config
 	AccessKeyID     string
 	SecretAccessKey string
@@ -71,8 +73,7 @@ func (u *User) Setup() {
 		log.Fatal(err)
 	}
 
-	log.Println("Updating the AWS config file")
-	err = u.Config.Add(*u.Profile)
+	err = u.UpdateAWSConfigFile()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -338,6 +339,36 @@ func (u *User) AddVaultProfile() error {
 	return nil
 }
 
+// UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
+func (u *User) UpdateAWSConfigFile() error {
+	log.Println("Updating the AWS config file")
+	// get path to aws config file
+	awsCfgPath, err := vault.ConfigPath()
+	if err != nil {
+		return fmt.Errorf("unable to get aws config file path: %w", err)
+	}
+	// load the ini file
+	iniFile, err := ini.Load(awsCfgPath)
+	if err != nil {
+		return fmt.Errorf("unable to load aws config file: %w", err)
+	}
+	// add the profile
+	sectionName := fmt.Sprintf("profile %s", u.Profile.Name)
+	section, err := iniFile.NewSection(sectionName)
+	if err != nil {
+		return fmt.Errorf("error creating section %q: %w", u.Profile.Name, err)
+	}
+	if err = section.ReflectFrom(&u.Profile); err != nil {
+		return fmt.Errorf("error mapping profile to ini file: %w", err)
+	}
+	_, err = section.NewKey("output", u.Output)
+	if err != nil {
+		return fmt.Errorf("unable to add output key: %w", err)
+	}
+	// save it back to the aws config path
+	return iniFile.SaveTo(awsCfgPath)
+}
+
 // RemoveVaultSession removes the aws-vault session for the profile.
 func (u *User) RemoveVaultSession() error {
 	log.Printf("Removing aws-vault session")
@@ -429,6 +460,7 @@ func main() {
 	user := User{
 		Name:    options.IAMUser,
 		Profile: &profile,
+		Output:  options.Output,
 		Config:  config,
 	}
 
