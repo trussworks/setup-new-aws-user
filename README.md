@@ -8,14 +8,24 @@ Installation instructions will go here.
 
 ## Usage
 
-The script requires the following environment variables to be set:
+The script accepts a number of arguments, either as environment variables or
+command-line flags:
 
-|Name|Description|Example
-|----|-----------|---------|
-|AWS_ACCOUNT_ID|AWS account number corresponding to the AWS_PROFILE account|`123456789012`
-|AWS_PROFILE|Alias for the account where this script is being run|`trussworks-id`
+    Usage:
+      main [OPTIONS]
+    Application Options:
+          --region=     The AWS region (default: us-west-2) [$AWS_REGION]
+          --account-id= The AWS account number [$AWS_ACCOUNT_ID]
+          --profile=    The AWS profile name [$AWS_PROFILE]
+          --iam-user=   The IAM user name
+          --role=       The user role type
+          --output=     The AWS CLI output format (default: json)
+    Help Options:
+      -h, --help        Show this help message
 
-For testing purposes, set the above variables in a .envrc.local file.
+For the arguments that accept either an environment variable or command-line
+flag, the environment variable takes precedence if both are provided due to the
+way go-flags works.
 
 ### Setup new IAM user
 
@@ -50,3 +60,25 @@ more than once**, as this will cause the process to fail.
    - `pre-commit install --install-hooks`
    - `direnv allow`
 1. The `.envrc` will be loaded if `direnv` is installed.
+
+### Testing
+
+For testing, create a test IAM user so as not to interfere with your primary
+user credentials and AWS config settings. The test user will need the
+`enforce-mfa` policy and permission to assume whichever role being assigned.
+Generate an access key for the user, and use those when running the script. For
+the AWS profile, do not use an existing profile name. You can use a dummy name
+for the profile; it doesn't need to match the account alias. However, you must
+use the real AWS account ID.
+
+Example:
+
+    go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
+
+After running the script, try a command to ensure the new profile works as
+expected:
+
+Example (include AWS_VAULT_KEYCHAIN_NAME if the environment variable is not
+set):
+
+    AWS_VAULT_KEYCHAIN_NAME=login aws-vault exec test-profile-name -- aws sts get-caller-identity
