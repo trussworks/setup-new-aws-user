@@ -37,7 +37,7 @@ in legendary-waddle repo to generate access keys.
     - Set them as local environment variables on your terminal, or
     - Pass them through as flags when you run this script
     (i.e.
-    `go run cmd/main.go --role <ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`)
+    `go run cmd/main.go --role <ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`)
 1. Run the setup-new-user script: `go run cmd/main.go --role <ROLE> --iam_user <USER>`
 1. Enter the access keys generated when prompted.
 1. The script will display a QR code for an MFA device at some point.
