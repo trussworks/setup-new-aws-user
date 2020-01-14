@@ -419,7 +419,7 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 }
 
 func printQRCode(payload string) error {
-	q, err := qrcode.New(payload, qrcode.Medium)
+	q, err := qrcode.New(payload, qrcode.Low)
 	if err != nil {
 		return fmt.Errorf("unable to create qr code: %w", err)
 	}
