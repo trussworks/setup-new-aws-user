@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	//"io/ioutil"
+
 	"log"
 	"os"
 
@@ -14,7 +16,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/jessevdk/go-flags"
+	"github.com/pkg/browser"
 	"github.com/skip2/go-qrcode"
+	"github.com/spf13/afero"
 	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/ini.v1"
 )
@@ -418,12 +422,58 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
+// func printQRCode(payload string) error {
+// 	q, err := qrcode.New(payload, qrcode.Low)
+// 	if err != nil {
+// 		return fmt.Errorf("unable to create qr code: %w", err)
+// 	}
+// 	fmt.Println(q.ToSmallString(false))
+// 	return nil
+// }
+
 func printQRCode(payload string) error {
-	q, err := qrcode.New(payload, qrcode.Low)
+	// In-Memory FileSystem
+	mm := afero.NewMemMapFs()
+
+	// Creates QR Code
+	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
-		return fmt.Errorf("unable to create qr code: %w", err)
+		return fmt.Errorf("unable to createt qr code: %w", err)
 	}
-	fmt.Println(q.ToSmallString(false))
+
+	// Generates a QR PNG 256 x 256, returns []byte
+	qr, err := q.PNG(256)
+	if err != nil {
+		return fmt.Errorf("unable to generate PNG: %w", err)
+	}
+
+	// Create a temp dit
+	err := mm.Mkdir("tmp", 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	// Generate the Temp File
+	tmpfile, err := afero.TempFile(mm, "tmp", "temp-qr-")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Writes the []byte that is qr to the Temp File
+	werr := afero.WriteFile(mm, tmpfile.Name(), qr, 0644)
+	if werr != nil {
+		log.Fatal(werr)
+	}
+
+	// Wants to open a file given a string (tmpfile.Name())
+	// Filed does not exist errors
+	// browser library supports browser.ReadFile(io.Reader), but the browser fails to open this "file"
+	browser.OpenFile(tmpfile.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		log.Fatal(err)
+	}
 	return nil
 }
 
