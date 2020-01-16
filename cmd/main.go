@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	//"io/ioutil"
+	"io/ioutil"
 
 	"log"
 	"os"
@@ -18,7 +18,6 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/browser"
 	"github.com/skip2/go-qrcode"
-	"github.com/spf13/afero"
 	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/ini.v1"
 )
@@ -27,6 +26,7 @@ const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
 var validate *validator.Validate
+var tempFile string
 
 // MFATokenPair holds two MFA tokens for enabling virtual
 // MFA device
@@ -432,9 +432,6 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 // }
 
 func printQRCode(payload string) error {
-	// In-Memory FileSystem
-	mm := afero.NewMemMapFs()
-
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
@@ -447,30 +444,27 @@ func printQRCode(payload string) error {
 		return fmt.Errorf("unable to generate PNG: %w", err)
 	}
 
-	// Create a temp dit
-	err := mm.Mkdir("tmp", 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-	// Generate the Temp File
-	tmpfile, err := afero.TempFile(mm, "tmp", "temp-qr-")
+	// Create a Temp File
+	tmpfile, err := ioutil.TempFile("", "temp-qr.*.png")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Writes the []byte that is qr to the Temp File
-	werr := afero.WriteFile(mm, tmpfile.Name(), qr, 0644)
-	if werr != nil {
-		log.Fatal(werr)
-	}
+	// Shot of Elmer's
+	tempFile = tmpfile.Name()
+	fmt.Println("Tempfile is: %w", tempFile)
 
-	// Wants to open a file given a string (tmpfile.Name())
-	// Filed does not exist errors
-	// browser library supports browser.ReadFile(io.Reader), but the browser fails to open this "file"
-	browser.OpenFile(tmpfile.Name())
-	if err != nil {
+	// Write the QR PNG to the Temp File
+	if _, err := tmpfile.Write(qr); err != nil {
+		tmpfile.Close()
 		log.Fatal(err)
 	}
+
+	berr := browser.OpenFile(tmpfile.Name())
+	if err != nil {
+		log.Fatal(berr)
+	}
+
 	if err := tmpfile.Close(); err != nil {
 		log.Fatal(err)
 	}
@@ -515,6 +509,14 @@ func main() {
 	}
 
 	user.Setup()
+
+	// Cleanup after ourselves
+	rerr := os.Remove(tempFile)
+	if rerr != nil {
+		log.Printf("Failed to delete file: %v, %v", tempFile, rerr)
+	} else {
+		fmt.Println("Deleting temp file: %w", tempFile)
+	}
 
 	// If we got this far, we win
 	log.Println("Victory!")
