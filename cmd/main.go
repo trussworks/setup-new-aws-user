@@ -422,15 +422,6 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-// func printQRCode(payload string) error {
-// 	q, err := qrcode.New(payload, qrcode.Low)
-// 	if err != nil {
-// 		return fmt.Errorf("unable to create qr code: %w", err)
-// 	}
-// 	fmt.Println(q.ToSmallString(false))
-// 	return nil
-// }
-
 func printQRCode(payload string) error {
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
@@ -452,7 +443,6 @@ func printQRCode(payload string) error {
 
 	// Shot of Elmer's
 	tempFile = tmpfile.Name()
-	fmt.Println("Tempfile is: %w", tempFile)
 
 	// Write the QR PNG to the Temp File
 	if _, err := tmpfile.Write(qr); err != nil {
@@ -515,7 +505,7 @@ func main() {
 	if rerr != nil {
 		log.Printf("Failed to delete file: %v, %v", tempFile, rerr)
 	} else {
-		fmt.Println("Deleting temp file: %w", tempFile)
+		fmt.Printf("Deleting temp file: %v", tempFile)
 	}
 
 	// If we got this far, we win
