@@ -26,6 +26,7 @@ const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
 var validate *validator.Validate
+var tempFile string
 
 // MFATokenPair holds two MFA tokens for enabling virtual
 // MFA device
@@ -476,12 +477,12 @@ func main() {
 	}
 
 	// Create a Temp File
-	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
+	tempfile, err := ioutil.TempFile("", "temp-qr.*.png")
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Cleanup after ourselves
-	defer os.Remove(tempFile.Name())
+	defer os.Remove(tempFile)
 
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
@@ -499,7 +500,7 @@ func main() {
 		Profile:    &profile,
 		Output:     options.Output,
 		Config:     config,
-		QRTempFile: tempFile,
+		QRTempFile: tempfile,
 	}
 
 	user.Setup()
