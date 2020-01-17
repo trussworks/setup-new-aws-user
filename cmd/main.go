@@ -26,7 +26,6 @@ const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
 var validate *validator.Validate
-var tempFile string
 
 // MFATokenPair holds two MFA tokens for enabling virtual
 // MFA device
@@ -52,6 +51,7 @@ type User struct {
 	Config          *vault.Config
 	AccessKeyID     string
 	SecretAccessKey string
+	QRTempFile      *os.File
 }
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
@@ -190,7 +190,7 @@ func (u *User) CreateVirtualMFADevice() error {
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
-	err = printQRCode(content)
+	err = printQRCode(content, u.QRTempFile)
 	if err != nil {
 		return fmt.Errorf("unable to print qr code: %w", err)
 	}
@@ -422,11 +422,11 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-func printQRCode(payload string) error {
+func printQRCode(payload string, tempfile *os.File) error {
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
-		return fmt.Errorf("unable to createt qr code: %w", err)
+		return fmt.Errorf("unable to create qr code: %w", err)
 	}
 
 	// Generates a QR PNG 256 x 256, returns []byte
@@ -435,27 +435,21 @@ func printQRCode(payload string) error {
 		return fmt.Errorf("unable to generate PNG: %w", err)
 	}
 
-	// Create a Temp File
-	tmpfile, err := ioutil.TempFile("", "temp-qr.*.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Shot of Elmer's
-	tempFile = tmpfile.Name()
+	tempFile = tempfile.Name()
 
 	// Write the QR PNG to the Temp File
-	if _, err := tmpfile.Write(qr); err != nil {
-		tmpfile.Close()
+	if _, err := tempfile.Write(qr); err != nil {
+		tempfile.Close()
 		log.Fatal(err)
 	}
 
-	berr := browser.OpenFile(tmpfile.Name())
+	berr := browser.OpenFile(tempfile.Name())
 	if err != nil {
 		log.Fatal(berr)
 	}
 
-	if err := tmpfile.Close(); err != nil {
+	if err := tempfile.Close(); err != nil {
 		log.Fatal(err)
 	}
 	return nil
@@ -465,6 +459,7 @@ func main() {
 	// parse command line flags
 	var options cliOptions
 	parser := flags.NewParser(&options, flags.Default)
+
 	_, err := parser.Parse()
 	if err != nil {
 		log.Fatal(err)
@@ -480,6 +475,14 @@ func main() {
 		Region: options.AwsRegion,
 	}
 
+	// Create a Temp File
+	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Cleanup after ourselves
+	defer os.Remove(tempFile.Name())
+
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
 		log.Fatal(err)
@@ -492,21 +495,14 @@ func main() {
 	}
 
 	user := User{
-		Name:    options.IAMUser,
-		Profile: &profile,
-		Output:  options.Output,
-		Config:  config,
+		Name:       options.IAMUser,
+		Profile:    &profile,
+		Output:     options.Output,
+		Config:     config,
+		QRTempFile: tempFile,
 	}
 
 	user.Setup()
-
-	// Cleanup after ourselves
-	rerr := os.Remove(tempFile)
-	if rerr != nil {
-		log.Printf("Failed to delete file: %v, %v", tempFile, rerr)
-	} else {
-		fmt.Printf("Deleting temp file: %v", tempFile)
-	}
 
 	// If we got this far, we win
 	log.Println("Victory!")
