@@ -426,7 +426,7 @@ func printQRCode(payload string) error {
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
-		return fmt.Errorf("unable to createt qr code: %w", err)
+		return fmt.Errorf("unable to create qr code: %w", err)
 	}
 
 	// Generates a QR PNG 256 x 256, returns []byte
