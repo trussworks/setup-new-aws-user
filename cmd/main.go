@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+
 	"log"
 	"os"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/jessevdk/go-flags"
+	"github.com/pkg/browser"
 	"github.com/skip2/go-qrcode"
 	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/ini.v1"
@@ -48,6 +51,7 @@ type User struct {
 	Config          *vault.Config
 	AccessKeyID     string
 	SecretAccessKey string
+	QRTempFile      *os.File
 }
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
@@ -186,7 +190,7 @@ func (u *User) CreateVirtualMFADevice() error {
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
-	err = printQRCode(content)
+	err = printQRCode(content, u.QRTempFile)
 	if err != nil {
 		return fmt.Errorf("unable to print qr code: %w", err)
 	}
@@ -418,12 +422,36 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-func printQRCode(payload string) error {
+func printQRCode(payload string, tempfile *os.File) error {
+	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
 		return fmt.Errorf("unable to create qr code: %w", err)
 	}
-	fmt.Println(q.ToSmallString(false))
+
+	// Generates a QR PNG 256 x 256, returns []byte
+	qr, err := q.PNG(256)
+	if err != nil {
+		return fmt.Errorf("unable to generate PNG: %w", err)
+	}
+
+	// Shot of Elmer's
+	tempFile = tempfile.Name()
+
+	// Write the QR PNG to the Temp File
+	if _, err := tempfile.Write(qr); err != nil {
+		tempfile.Close()
+		log.Fatal(err)
+	}
+
+	berr := browser.OpenFile(tempfile.Name())
+	if err != nil {
+		log.Fatal(berr)
+	}
+
+	if err := tempfile.Close(); err != nil {
+		log.Fatal(err)
+	}
 	return nil
 }
 
@@ -431,6 +459,7 @@ func main() {
 	// parse command line flags
 	var options cliOptions
 	parser := flags.NewParser(&options, flags.Default)
+
 	_, err := parser.Parse()
 	if err != nil {
 		log.Fatal(err)
@@ -446,6 +475,14 @@ func main() {
 		Region: options.AwsRegion,
 	}
 
+	// Create a Temp File
+	tempfile, err := ioutil.TempFile("", "temp-qr.*.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Cleanup after ourselves
+	defer os.Remove(tempfile.Name())
+
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
 		log.Fatal(err)
@@ -458,10 +495,11 @@ func main() {
 	}
 
 	user := User{
-		Name:    options.IAMUser,
-		Profile: &profile,
-		Output:  options.Output,
-		Config:  config,
+		Name:       options.IAMUser,
+		Profile:    &profile,
+		Output:     options.Output,
+		Config:     config,
+		QRTempFile: tempfile,
 	}
 
 	user.Setup()
