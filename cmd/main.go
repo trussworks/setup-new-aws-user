@@ -26,7 +26,6 @@ const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
 var validate *validator.Validate
-var tempFile string
 
 // MFATokenPair holds two MFA tokens for enabling virtual
 // MFA device
@@ -482,7 +481,7 @@ func main() {
 		log.Fatal(err)
 	}
 	// Cleanup after ourselves
-	defer os.Remove(tempFile)
+	defer os.Remove(tempfile.Name())
 
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
