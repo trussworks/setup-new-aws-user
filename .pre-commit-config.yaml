@@ -1,23 +1,17 @@
----
 repos:
-  - repo: git://github.com/golangci/golangci-lint
-    rev: v1.21.0
-    hooks:
-      - id: golangci-lint
-
   - repo: git://github.com/pre-commit/pre-commit-hooks
     rev: v2.4.0
     hooks:
-      - id: check-added-large-files
+      - id: check-json
       - id: check-merge-conflict
       - id: check-yaml
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-        args: [--fix=no]
+      - id: detect-private-key
+      - id: pretty-format-json
+        args:
+          - --autofix
       - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
 
   - repo: git://github.com/igorshubovych/markdownlint-cli
-    rev: v0.19.0
+    rev: v0.21.0
     hooks:
       - id: markdownlint
