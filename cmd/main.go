@@ -436,7 +436,7 @@ func printQRCode(payload string, tempfile *os.File) error {
 	}
 
 	// Shot of Elmer's
-	tempFile = tempfile.Name()
+	tempFile := tempfile.Name()
 
 	// Write the QR PNG to the Temp File
 	if _, err := tempfile.Write(qr); err != nil {
