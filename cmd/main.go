@@ -435,9 +435,6 @@ func printQRCode(payload string, tempfile *os.File) error {
 		return fmt.Errorf("unable to generate PNG: %w", err)
 	}
 
-	// Shot of Elmer's
-	tempFile = tempfile.Name()
-
 	// Write the QR PNG to the Temp File
 	if _, err := tempfile.Write(qr); err != nil {
 		tempfile.Close()
