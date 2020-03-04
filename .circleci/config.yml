@@ -21,7 +21,7 @@ jobs:
             - ~/.cache/pre-commit
   release:
     docker:
-      - image: *circleci_docker_primary 
+      - image: *circleci_docker_primary
     steps:
       - checkout
       - run: curl -sL https://git.io/goreleaser | bash
@@ -32,7 +32,7 @@ workflows:
     jobs:
       - validate
       - release:
-          requires: 
+          requires:
             - validate
           filters:
             branches:
