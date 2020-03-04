@@ -33,7 +33,7 @@ workflows:
       - release:
           filters:
             branches:
-              ignore: /.*/
+              ignore: /^.*/
             tags:
               only: /^v.*/
 
