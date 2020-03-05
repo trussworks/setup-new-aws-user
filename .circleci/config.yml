@@ -28,15 +28,11 @@ jobs:
 
 workflows:
   version: 2.1
-  validate:
+  main:
     jobs:
       - validate
-  release:
-    jobs:
       - release:
           filters:
-            branches:
-              ignore: /^.*/
             tags:
               only: /^v.*/
 
