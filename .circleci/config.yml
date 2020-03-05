@@ -30,7 +30,10 @@ workflows:
   version: 2.1
   main:
     jobs:
+      - validate
       - release:
+          requires:
+            - validate
           filters:
             branches:
               ignore: /^.*/
