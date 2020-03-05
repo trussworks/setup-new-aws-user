@@ -28,12 +28,12 @@ jobs:
 
 workflows:
   version: 2.1
-  main:
+  validate:
     jobs:
       - validate
+  release:
+    jobs:
       - release:
-          requires:
-            - validate
           filters:
             branches:
               ignore: /^.*/
