@@ -8,6 +8,12 @@ builds:
   goarch:
     - amd64
   main: ./cmd/main.go
+brews:
+  - description: "A tool that creates a virtual MFA device and rotates access keys for a new AWS user."
+    github:
+      owner: trussworks
+      name: homebrew-tap
+    homepage: "https://github.com/trussworks/setup-new-aws-user"
 archives:
 - replacements:
     darwin: Darwin
