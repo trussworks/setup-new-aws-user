@@ -14,6 +14,9 @@ brews:
       owner: trussworks
       name: homebrew-tap
     homepage: "https://github.com/trussworks/setup-new-aws-user"
+    commit_author:
+      name: trussworks-infra
+      email: infra+github@truss.works
 archives:
 - replacements:
     darwin: Darwin
