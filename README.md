@@ -4,24 +4,31 @@ This script creates a virtual MFA device and rotates access keys for a new AWS u
 
 ## Installation
 
-Installation instructions will go here.
+For OSX Homebrew:
+
+```sh
+$ brew tap trussworks/tap
+$ brew install setup-new-aws-user
+```
 
 ## Usage
 
 The script accepts a number of arguments, either as environment variables or
 command-line flags:
 
-    Usage:
-      main [OPTIONS]
-    Application Options:
-          --region=     The AWS region (default: us-west-2) [$AWS_REGION]
-          --account-id= The AWS account number [$AWS_ACCOUNT_ID]
-          --profile=    The AWS profile name [$AWS_PROFILE]
-          --iam-user=   The IAM user name
-          --role=       The user role type
-          --output=     The AWS CLI output format (default: json)
-    Help Options:
-      -h, --help        Show this help message
+```
+Usage:
+  main [OPTIONS]
+  Application Options:
+    --region=     The AWS region (default: us-west-2) [$AWS_REGION]
+    --account-id= The AWS account number [$AWS_ACCOUNT_ID]
+    --profile=    The AWS profile name [$AWS_PROFILE]
+    --iam-user=   The IAM user name
+    --role=       The user role type
+    --output=     The AWS CLI output format (default: json)
+  Help Options:
+    -h, --help        Show this help message
+```
 
 For the arguments that accept either an environment variable or command-line
 flag, the environment variable takes precedence if both are provided due to the
@@ -73,7 +80,9 @@ use the real AWS account ID.
 
 Example:
 
-    go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
+```
+go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
+```
 
 After running the script, try a command to ensure the new profile works as
 expected:
@@ -81,4 +90,6 @@ expected:
 Example (include AWS_VAULT_KEYCHAIN_NAME if the environment variable is not
 set):
 
-    AWS_VAULT_KEYCHAIN_NAME=login aws-vault exec test-profile-name -- aws sts get-caller-identity
+```
+AWS_VAULT_KEYCHAIN_NAME=login aws-vault exec test-profile-name -- aws sts get-caller-identity
+```
