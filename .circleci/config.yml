@@ -1,12 +1,9 @@
 version: 2.1
 
-references:
-  circleci_docker_primary: &circleci_docker_primary trussworks/circleci-docker-primary:735a60a78114453f050c2ba45400c4aa6c9e06f2
-
 jobs:
   validate:
     docker:
-      - image: *circleci_docker_primary
+      - image: trussworks/circleci-docker-primary:735a60a78114453f050c2ba45400c4aa6c9e06f2
     steps:
       - checkout
       - restore_cache:
@@ -21,10 +18,12 @@ jobs:
             - ~/.cache/pre-commit
   release:
     docker:
-      - image: *circleci_docker_primary
+      - image: goreleaser/goreleaser
     steps:
       - checkout
-      - run: curl -sL https://git.io/goreleaser | bash
+      - run:
+          name: Run goreleaser
+          command: goreleaser
 
 workflows:
   version: 2.1
