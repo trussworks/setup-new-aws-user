@@ -43,7 +43,7 @@ func TestExistingAWSProfile(t *testing.T) {
 		Profile:    &profile,
 		Output:     "json",
 		Config:     config,
-		QRTempFile: nil,
+		QrTempFile: nil,
 		Keyring:    keyring,
 	}
 
@@ -53,11 +53,11 @@ func TestExistingAWSProfile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPrintQRCode(t *testing.T) {
+func TestGenerateQrCode(t *testing.T) {
 	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
 	assert.NoError(t, err)
 	defer os.Remove(tempFile.Name())
 
-	err = printQRCode("otpauth://totp/super@top?secret=secret", tempFile)
+	err = generateQrCode("otpauth://totp/super@top?secret=secret", tempFile)
 	assert.NoError(t, err)
 }

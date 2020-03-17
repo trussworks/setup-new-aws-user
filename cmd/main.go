@@ -51,7 +51,7 @@ type User struct {
 	Config          *vault.Config
 	AccessKeyID     string
 	SecretAccessKey string
-	QRTempFile      *os.File
+	QrTempFile      *os.File
 	Keyring         *keyring.Keyring
 }
 
@@ -191,9 +191,13 @@ func (u *User) CreateVirtualMFADevice() error {
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
-	err = printQRCode(content, u.QRTempFile)
+	err = generateQrCode(content, u.QrTempFile)
 	if err != nil {
-		return fmt.Errorf("unable to print qr code: %w", err)
+		return fmt.Errorf("unable to generate qr code: %w", err)
+	}
+	err = openQrCode(u.QrTempFile)
+	if err != nil {
+		return fmt.Errorf("unable to open qr code png: %w", err)
 	}
 
 	return nil
@@ -378,8 +382,11 @@ func (u *User) RemoveVaultSession() error {
 
 func getKeyring(keychainName string) (*keyring.Keyring, error) {
 	ring, err := keyring.Open(keyring.Config{
-		ServiceName:              "aws-vault",
-		AllowedBackends:          []keyring.BackendType{keyring.KeychainBackend},
+		ServiceName: "aws-vault",
+		AllowedBackends: []keyring.BackendType{
+			keyring.KeychainBackend,
+			keyring.FileBackend,
+		},
 		KeychainName:             keychainName,
 		KeychainTrustApplication: true,
 	})
@@ -403,7 +410,7 @@ func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Key
 	return nil
 }
 
-func printQRCode(payload string, tempfile *os.File) error {
+func generateQrCode(payload string, tempFile *os.File) error {
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
 	if err != nil {
@@ -417,17 +424,20 @@ func printQRCode(payload string, tempfile *os.File) error {
 	}
 
 	// Write the QR PNG to the Temp File
-	if _, err := tempfile.Write(qr); err != nil {
-		tempfile.Close()
+	if _, err := tempFile.Write(qr); err != nil {
+		tempFile.Close()
 		return err
 	}
+	return nil
+}
 
-	err = browser.OpenFile(tempfile.Name())
+func openQrCode(tempFile *os.File) error {
+	err := browser.OpenFile(tempFile.Name())
 	if err != nil {
 		return fmt.Errorf("unable to open QR Code PNG: %w", err)
 	}
 
-	if err := tempfile.Close(); err != nil {
+	if err := tempFile.Close(); err != nil {
 		return fmt.Errorf("unable to close QR Code: %w", err)
 	}
 	return nil
@@ -489,7 +499,7 @@ func main() {
 		Profile:    &profile,
 		Output:     options.Output,
 		Config:     config,
-		QRTempFile: tempfile,
+		QrTempFile: tempfile,
 		Keyring:    keyring,
 	}
 	if checkExistingAWSProfile(profile.Name, config) != nil {
