@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  go: gotest/tools@0.0.13
-
 jobs:
   validate:
     docker:
@@ -19,17 +16,6 @@ jobs:
           key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
-  test:
-    macos:
-      xcode: '11.3.0'
-    steps:
-      - checkout
-      - go/mod-download:
-          prefix: v1-mac
-          path: /Users/distiller/go/pkg/mod
-      - run:
-          name: Install GoLang devtools
-          command: ./do install-devtools
 
   release:
     docker:
@@ -45,7 +31,6 @@ workflows:
   test:
     jobs:
       - validate
-      - test
   release:
     jobs:
       - release:
