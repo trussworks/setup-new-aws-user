@@ -16,7 +16,6 @@ jobs:
           key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
-
   release:
     docker:
       - image: goreleaser/goreleaser:v0.128
@@ -28,7 +27,7 @@ jobs:
 
 workflows:
   version: 2.1
-  test:
+  validate:
     jobs:
       - validate
   release:
