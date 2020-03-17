@@ -52,6 +52,7 @@ type User struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	QRTempFile      *os.File
+	Keyring         *keyring.Keyring
 }
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
@@ -154,7 +155,7 @@ func (u *User) newMFASession() (*session.Session, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to get mfa session: %w", err)
+		return nil, fmt.Errorf("unable to get MFA session: %w", err)
 	}
 	return mfaSession, nil
 }
@@ -176,7 +177,7 @@ func (u *User) CreateVirtualMFADevice() error {
 
 	mfaDeviceOutput, err := svc.CreateVirtualMFADevice(mfaDeviceInput)
 	if err != nil {
-		return fmt.Errorf("unable to create virtual mfa: %w", err)
+		return fmt.Errorf("unable to create virtual MFA: %w", err)
 	}
 
 	u.Profile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
@@ -239,9 +240,9 @@ func getMFATokenPair() MFATokenPair {
 
 // EnableVirtualMFADevice enables the user's MFA device
 func (u *User) EnableVirtualMFADevice() error {
-	log.Println("Enabling the virtual mfa device")
+	log.Println("Enabling the virtual MFA device")
 	if u.Profile.MFASerial == "" {
-		return fmt.Errorf("profile mfa serial must be set")
+		return fmt.Errorf("profile MFA serial must be set")
 	}
 
 	mfaTokenPair := getMFATokenPair()
@@ -261,7 +262,7 @@ func (u *User) EnableVirtualMFADevice() error {
 
 	_, err = svc.EnableMFADevice(enableMFADeviceInput)
 	if err != nil {
-		return fmt.Errorf("unable to enable mfa device: %w", err)
+		return fmt.Errorf("unable to enable MFA device: %w", err)
 	}
 
 	return nil
@@ -321,21 +322,17 @@ func (u *User) RotateAccessKeys() error {
 // AddVaultProfile uses aws-vault to store AWS credentials for the user's
 // profile.
 func (u *User) AddVaultProfile() error {
-	keyring, err := getKeyRing()
-	if err != nil {
-		return fmt.Errorf("unable to get keyring: %w", err)
-	}
-
 	creds := credentials.Value{AccessKeyID: u.AccessKeyID, SecretAccessKey: u.SecretAccessKey}
-	provider := &vault.KeyringProvider{Keyring: *keyring, Profile: u.Profile.Name}
+	provider := &vault.KeyringProvider{Keyring: *u.Keyring, Profile: u.Profile.Name}
 
-	if err := provider.Store(creds); err != nil {
+	err := provider.Store(creds)
+	if err != nil {
 		return fmt.Errorf("unable to store credentials: %w", err)
 	}
 
-	log.Printf("Added credentials to profile %q in vault\n", u.Profile.Name)
+	log.Printf("Added credentials to profile %q in vault", u.Profile.Name)
 
-	err = deleteSession(u.Profile.Name, u.Config, keyring)
+	err = deleteSession(u.Profile.Name, u.Config, u.Keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -345,14 +342,9 @@ func (u *User) AddVaultProfile() error {
 
 // UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
 func (u *User) UpdateAWSConfigFile() error {
-	log.Println("Updating the AWS config file")
-	// get path to aws config file
-	awsCfgPath, err := vault.ConfigPath()
-	if err != nil {
-		return fmt.Errorf("unable to get aws config file path: %w", err)
-	}
+	log.Printf("Updating the AWS config file: %s", u.Config.Path)
 	// load the ini file
-	iniFile, err := ini.Load(awsCfgPath)
+	iniFile, err := ini.Load(u.Config.Path)
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
@@ -370,19 +362,13 @@ func (u *User) UpdateAWSConfigFile() error {
 		return fmt.Errorf("unable to add output key: %w", err)
 	}
 	// save it back to the aws config path
-	return iniFile.SaveTo(awsCfgPath)
+	return iniFile.SaveTo(u.Config.Path)
 }
 
 // RemoveVaultSession removes the aws-vault session for the profile.
 func (u *User) RemoveVaultSession() error {
 	log.Printf("Removing aws-vault session")
-
-	keyring, err := getKeyRing()
-	if err != nil {
-		return fmt.Errorf("unable to get keyring: %w", err)
-	}
-
-	err = deleteSession(u.Profile.Name, u.Config, keyring)
+	err := deleteSession(u.Profile.Name, u.Config, u.Keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -390,12 +376,7 @@ func (u *User) RemoveVaultSession() error {
 	return nil
 }
 
-func getKeyRing() (*keyring.Keyring, error) {
-	keychainName := os.Getenv("AWS_VAULT_KEYCHAIN_NAME")
-	if keychainName == "" {
-		keychainName = "login"
-	}
-
+func getKeyring(keychainName string) (*keyring.Keyring, error) {
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:              "aws-vault",
 		AllowedBackends:          []keyring.BackendType{keyring.KeychainBackend},
@@ -438,17 +419,27 @@ func printQRCode(payload string, tempfile *os.File) error {
 	// Write the QR PNG to the Temp File
 	if _, err := tempfile.Write(qr); err != nil {
 		tempfile.Close()
-		log.Fatal(err)
+		return err
 	}
 
-	berr := browser.OpenFile(tempfile.Name())
+	err = browser.OpenFile(tempfile.Name())
 	if err != nil {
-		log.Fatal(berr)
+		return fmt.Errorf("unable to open QR Code PNG: %w", err)
 	}
 
 	if err := tempfile.Close(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("unable to close QR Code: %w", err)
 	}
+	return nil
+}
+
+func checkExistingAWSProfile(profileName string, config *vault.Config) error {
+	log.Println("Checking whether profile exists in AWS config file")
+	_, exists := config.Profile(profileName)
+	if exists {
+		return fmt.Errorf("Profile already exists in AWS config file: %s", profileName)
+	}
+
 	return nil
 }
 
@@ -485,20 +476,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Checking whether profile exists in AWS config file")
-	_, exists := config.Profile(profile.Name)
-	if exists {
-		log.Fatalf("Profile already exists in AWS config file: %s", profile.Name)
+	keychainName := os.Getenv("AWS_VAULT_KEYCHAIN_NAME")
+	if keychainName == "" {
+		keychainName = "login"
 	}
-
+	keyring, err := getKeyring(keychainName)
+	if err != nil {
+		log.Fatal(err)
+	}
 	user := User{
 		Name:       options.IAMUser,
 		Profile:    &profile,
 		Output:     options.Output,
 		Config:     config,
 		QRTempFile: tempfile,
+		Keyring:    keyring,
 	}
-
+	if checkExistingAWSProfile(profile.Name, config) != nil {
+		log.Fatal(err)
+	}
 	user.Setup()
 
 	// If we got this far, we win

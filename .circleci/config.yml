@@ -16,6 +16,21 @@ jobs:
           key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
+  test:
+    docker:
+      - image: trussworks/circleci-docker-primary:735a60a78114453f050c2ba45400c4aa6c9e06f2
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-sources-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Go tests
+          command: go test -v ./cmd/...
+      - save_cache:
+          key: go-mod-sources-v1-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
   release:
     docker:
       - image: goreleaser/goreleaser:v0.128
@@ -27,9 +42,10 @@ jobs:
 
 workflows:
   version: 2.1
-  validate:
+  test:
     jobs:
       - validate
+      - test
   release:
     jobs:
       - release:
