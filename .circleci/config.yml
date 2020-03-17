@@ -1,21 +1,29 @@
 version: 2.1
 
+references:
+  circleci-docker-primary: &circleci-docker-primary trussworks/circleci-docker-primary:3ce332312856084283853e50c98a3e68e8241e89
+
 jobs:
-  validate:
+  test:
     docker:
-      - image: trussworks/circleci-docker-primary:735a60a78114453f050c2ba45400c4aa6c9e06f2
+      - image: *circleci-docker-primary
     steps:
       - checkout
       - restore_cache:
           keys:
             - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+            - go-mod-sources-v1-{{ checksum "go.sum" }}
       - run:
-          name: Run pre-commit tests
-          command: pre-commit run --all-files
+          name: Run pre-commit and Go tests
+          command: make test
       - save_cache:
           key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
           paths:
             - ~/.cache/pre-commit
+      - save_cache:
+          key: go-mod-sources-v1-{{ checksum "go.sum" }}
+          paths:
+            - "~/go/pkg/mod"
   release:
     docker:
       - image: goreleaser/goreleaser:v0.128
@@ -27,9 +35,9 @@ jobs:
 
 workflows:
   version: 2.1
-  validate:
+  test:
     jobs:
-      - validate
+      - test
   release:
     jobs:
       - release:
