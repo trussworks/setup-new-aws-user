@@ -502,7 +502,8 @@ func main() {
 		QrTempFile: tempfile,
 		Keyring:    keyring,
 	}
-	if checkExistingAWSProfile(profile.Name, config) != nil {
+	err = checkExistingAWSProfile(profile.Name, config)
+	if err != nil {
 		log.Fatal(err)
 	}
 	user.Setup()
