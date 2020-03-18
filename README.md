@@ -6,9 +6,9 @@ This script creates a virtual MFA device and rotates access keys for a new AWS u
 
 For OSX Homebrew:
 
-```sh
-$ brew tap trussworks/tap
-$ brew install setup-new-aws-user
+```shell
+brew tap trussworks/tap
+brew install setup-new-aws-user
 ```
 
 ## Usage
@@ -16,7 +16,7 @@ $ brew install setup-new-aws-user
 The script accepts a number of arguments, either as environment variables or
 command-line flags:
 
-```
+```text
 Usage:
   main [OPTIONS]
   Application Options:
@@ -80,7 +80,7 @@ use the real AWS account ID.
 
 Example:
 
-```
+```shell
 go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
 ```
 
@@ -90,6 +90,6 @@ expected:
 Example (include AWS_VAULT_KEYCHAIN_NAME if the environment variable is not
 set):
 
-```
+```shell
 AWS_VAULT_KEYCHAIN_NAME=login aws-vault exec test-profile-name -- aws sts get-caller-identity
 ```
