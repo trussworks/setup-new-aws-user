@@ -1,9 +1,10 @@
 # setup-new-aws-user
 
-This tool is used to grant programmatic access to AWS account(s) that aren't
-backed by SAML federation or SSO. It works by taking a temporary set of AWS
-access keys for a new IAM user. It then generates a virtual MFA device and permanent
-set of access keys. Finally, it removes the temporary access keys.
+This tool is used to grant programmatic access to AWS account(s) using
+[aws-vault](https://github.com/99designs/aws-vault). It works by taking a
+temporary set of AWS access keys for a new IAM user. It then generates a
+virtual MFA device and permanent set of access keys. Finally, it removes
+the temporary access keys.
 
 ## Installation
 
@@ -17,6 +18,12 @@ brew install setup-new-aws-user
 ## Usage
 
 ### Prerequisites
+
+#### Dependencies
+
+```shell
+brew cask install aws-vault
+```
 
 Before running this tool, you will need to following pieces of information
 
@@ -35,14 +42,14 @@ Before running this tool, you will need to following pieces of information
 
 1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
 2. Enter the access keys generated when prompted.
-3. The script will display a QR code for an MFA device at some point.
-4. Create an entry in your 1Password account with a One Time Password (OTP)
-field and be ready to scan it with the 1Password app.
-
+3. The script will open a window with a QR code, which you will use to configure
+  a temporary one time password (TOTP).
+4. Create an entry in your 1Password account field and be ready to scan it with the 1Password app.
 **NOTE** You will be asked for your MFA (TOTP) tokens three times while
 validating the new virtual MFA device and rotating your access keys.
 **Take care not to use the same token
 more than once**, as this will cause the process to fail.
+5. Once the tool has completed, you should be able to access the AWS account. You can run the following
 
 ## Development setup
 
