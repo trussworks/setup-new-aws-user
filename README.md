@@ -42,14 +42,16 @@ Before running this tool, you will need to following pieces of information
 
 1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
 2. Enter the access keys generated when prompted.
-3. The script will open a window with a QR code, which you will use to configure
-  a temporary one time password (TOTP).
-4. Create an entry in your 1Password account field and be ready to scan it with the 1Password app.
-**NOTE** You will be asked for your MFA (TOTP) tokens three times while
-validating the new virtual MFA device and rotating your access keys.
-**Take care not to use the same token
-more than once**, as this will cause the process to fail.
-5. Once the tool has completed, you should be able to access the AWS account. You can run the following
+
+3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
+4. You'll then need to create a new entry in your 1Password account configure it with a TOTP field.
+5. Use 1Password to scan the QR code and hit save. New TOTP tokens should generate every 30 seconds.
+6. From here the tool will prompt you for 3 unique TOTP tokens. **NOTE Take care not to use the same token more than once, as this will cause the process to fail.**
+7. Once the tool has completed, you should be able to access the AWS account. You can run the following command filling in the AWS_PROFILE value
+
+```shell
+aws-vault exec AWS_PROFILE -- aws sts get-session
+```
 
 ## Development setup
 
