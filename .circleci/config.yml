@@ -1,7 +1,7 @@
 version: 2.1
 
 references:
-  circleci-docker-primary: &circleci-docker-primary trussworks/circleci-docker-primary:3ce332312856084283853e50c98a3e68e8241e89
+  circleci-docker-primary: &circleci-docker-primary trussworks/circleci-docker-primary:d7f27acdab24f86297220a43f704f23f2bab667d
 
 jobs:
   test:
@@ -26,7 +26,7 @@ jobs:
             - "~/go/pkg/mod"
   release:
     docker:
-      - image: goreleaser/goreleaser:v0.128
+      - image: goreleaser/goreleaser:v0.130
     steps:
       - checkout
       - run:

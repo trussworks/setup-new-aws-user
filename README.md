@@ -1,10 +1,14 @@
 # setup-new-aws-user
 
-This script creates a virtual MFA device and rotates access keys for a new AWS user.
+This tool is used to grant programmatic access to AWS account(s) using
+[aws-vault](https://github.com/99designs/aws-vault). It works by taking a
+temporary set of AWS access keys for a new IAM user. It then generates a
+virtual MFA device and permanent set of access keys. Finally, it removes
+the temporary access keys.
 
 ## Installation
 
-For OSX Homebrew:
+For Mac OS Homebrew:
 
 ```shell
 brew tap trussworks/tap
@@ -13,62 +17,60 @@ brew install setup-new-aws-user
 
 ## Usage
 
-The script accepts a number of arguments, either as environment variables or
-command-line flags:
+### Prerequisites
 
-```text
-Usage:
-  main [OPTIONS]
-  Application Options:
-    --region=     The AWS region (default: us-west-2) [$AWS_REGION]
-    --account-id= The AWS account number [$AWS_ACCOUNT_ID]
-    --profile=    The AWS profile name [$AWS_PROFILE]
-    --iam-user=   The IAM user name
-    --role=       The user role type
-    --output=     The AWS CLI output format (default: json)
-  Help Options:
-    -h, --help        Show this help message
+#### Dependencies
+
+```shell
+brew cask install aws-vault
 ```
 
-For the arguments that accept either an environment variable or command-line
-flag, the environment variable takes precedence if both are provided due to the
-way go-flags works.
+Before running this tool, you will need to following pieces of information
 
-### Setup new IAM user
+* IAM role - This is the IAM Role with permissions allowing access to AWS APIs
+  and services. This is usually something like `admin` or `engineer`.
+* IAM user name - This is your IAM username.
+* AWS profile - This is the name that populates your `~/.aws/config` profile
+  name. It is usually the name of the aws account alias you are trying to access.
+* AWS account Id - This is the 12-digit account number of the AWS account you
+  are trying to access.
+* Temporary AWS access keys - These should be given to you by an administrator
+  of the AWS account you are trying to access. The tool will prompt you for
+  the access key id and secret access key.
 
-1. Have admin user run through
-[these instructions](https://github.com/trussworks/legendary-waddle/blob/master/docs/how-to/setup-new-user.md#existing-admin-user-does-this)
-in legendary-waddle repo to generate access keys.
-1. Set `AWS_ACCOUNT_ID` and `AWS_PROFILE` variables in one of three ways:
-    - Save to an .envrc.local file
-    - Set them as local environment variables on your terminal, or
-    - Pass them through as flags when you run this script
-    (i.e.
-    `go run cmd/main.go --role <ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`)
-1. Run the setup-new-user script: `go run cmd/main.go --role <ROLE> --iam_user <USER>`
-1. Enter the access keys generated when prompted.
-1. The script will display a QR code for an MFA device at some point.
-Create an entry in your 1Password account with a One Time Password (OTP)
-field and be ready to scan it with the 1Password app.
-Currently works only with mobile app.
+## Running the tool
 
-- **NOTE** You will be asked for your MFA (TOTP) tokens three times while
-validating the new virtual MFA device and rotating your access keys.
-**Take care not to use the same token
-more than once**, as this will cause the process to fail.
+1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
+2. Enter the access keys generated when prompted.
 
-## Dev setup
+3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
+4. You'll then need to create a new entry in your 1Password account configure it with a TOTP field.
+5. Use 1Password to scan the QR code and hit save. New TOTP tokens should generate every 30 seconds.
+6. From here the tool will prompt you for 3 unique TOTP tokens. **NOTE Take care not to use the same token more than once, as this will cause the process to fail.**
+7. Once the tool has completed, you should be able to access the AWS account. You can run the following command filling in the AWS_PROFILE value
 
-1. First, install these packages:
-   - `brew install pre-commit`
-   - `brew install direnv`
-1. Next, clone the project repository.
-1. Finally, run these commands inside the local repo:
-   - `pre-commit install --install-hooks`
-   - `direnv allow`
-1. The `.envrc` will be loaded if `direnv` is installed.
+```shell
+aws-vault exec AWS_PROFILE -- aws sts get-session
+```
+
+## Development setup
+
+1. First, install these packages: `brew install pre-commit direnv go`
+2. Next, clone the project repository.
+3. Finally, run these commands inside the local repo: `direnv allow`
+4. The `.envrc` will be loaded if `direnv` is installed.
 
 ### Testing
+
+#### Unit Tests
+
+Run pre-commit and Go tests
+
+```shell
+make test
+```
+
+#### Integration / End 2 End Testing
 
 For testing, create a test IAM user so as not to interfere with your primary
 user credentials and AWS config settings. The test user will need the
