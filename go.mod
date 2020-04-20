@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20191030013236-08380e6561cc
 	github.com/99designs/keyring v1.1.4
-	github.com/aws/aws-sdk-go v1.29.34
+	github.com/aws/aws-sdk-go v1.30.9
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/keybase/go-keychain v0.0.0-20191114153608-ccd67945d59e // indirect
