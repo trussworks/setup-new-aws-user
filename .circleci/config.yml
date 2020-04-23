@@ -43,6 +43,5 @@ workflows:
       - release:
           filters:
             branches:
-              ignore: /^.*/
-            tags:
-              only: /^v.*/
+              only:
+                - mk-available-backends
