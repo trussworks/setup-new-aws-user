@@ -382,11 +382,8 @@ func (u *User) RemoveVaultSession() error {
 
 func getKeyring(keychainName string) (*keyring.Keyring, error) {
 	ring, err := keyring.Open(keyring.Config{
-		ServiceName: "aws-vault",
-		AllowedBackends: []keyring.BackendType{
-			keyring.KeychainBackend,
-			keyring.FileBackend,
-		},
+		ServiceName:              "aws-vault",
+		AllowedBackends:          keyring.AvailableBackends(),
 		KeychainName:             keychainName,
 		KeychainTrustApplication: true,
 	})
