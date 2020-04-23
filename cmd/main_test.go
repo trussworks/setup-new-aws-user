@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/99designs/aws-vault/vault"
+	"github.com/99designs/keyring"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +37,7 @@ func TestExistingAWSProfile(t *testing.T) {
 			"123456789", "engineer"),
 		Region: "us-west-2",
 	}
-	keyring, err := getKeyring("test")
+	keyring, err := getKeyring("test", keyring.FileBackend)
 	assert.NoError(t, err)
 	user := User{
 		Name:       "test",
