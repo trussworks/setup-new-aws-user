@@ -24,25 +24,9 @@ jobs:
           key: go-mod-sources-v1-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
-  release:
-    docker:
-      - image: goreleaser/goreleaser:v0.130
-    steps:
-      - checkout
-      - run:
-          name: Run goreleaser
-          command: goreleaser
 
 workflows:
   version: 2.1
   test:
     jobs:
       - test
-  release:
-    jobs:
-      - release:
-          filters:
-            branches:
-              ignore: /^.*/
-            tags:
-              only: /^v.*/
