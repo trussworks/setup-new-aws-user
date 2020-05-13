@@ -453,11 +453,12 @@ func checkExistingAWSProfile(profileName string, config *vault.Config) error {
 	return nil
 }
 
-func getPartition(region string) string {
-	if partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), region); ok {
-		return partition.ID()
+func getPartition(region string) (string, error) {
+	partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), region)
+	if !ok {
+		return "", fmt.Errorf("Error finding partition for region: %s", region)
 	}
-	return "aws"
+	return partition.ID(), nil
 }
 
 func main() {
@@ -473,10 +474,15 @@ func main() {
 	validate = validator.New()
 
 	// initialize things
+	partition, err := getPartition(options.AwsRegion)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	profile := vault.Profile{
 		Name: options.AwsProfile,
 		RoleARN: fmt.Sprintf("arn:%s:iam::%d:role/%s",
-			getPartition(options.AwsRegion),
+			partition,
 			options.AwsAccountID,
 			options.Role),
 		Region: options.AwsRegion,

@@ -63,10 +63,14 @@ func TestGenerateQrCode(t *testing.T) {
 }
 
 func TestGetPartition(t *testing.T) {
-	commPartition := getPartition("us-west-2")
+	commPartition, err := getPartition("us-west-2")
 	assert.Equal(t, commPartition, "aws")
-	govPartition := getPartition("us-gov-west-1")
+	assert.NoError(t, err)
+
+	govPartition, err := getPartition("us-gov-west-1")
 	assert.Equal(t, govPartition, "aws-us-gov")
-	unknownPartition := getPartition("aws-under-the-sea")
-	assert.Equal(t, unknownPartition, "aws")
+	assert.NoError(t, err)
+
+	_, err = getPartition("aws-under-the-sea")
+	assert.Error(t, err)
 }
