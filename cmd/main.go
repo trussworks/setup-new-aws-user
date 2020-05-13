@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-
 	"log"
 	"os"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/99designs/keyring"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -453,6 +453,13 @@ func checkExistingAWSProfile(profileName string, config *vault.Config) error {
 	return nil
 }
 
+func getPartition(region string) string {
+	if partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), region); ok {
+		return partition.ID()
+	}
+	return "aws"
+}
+
 func main() {
 	// parse command line flags
 	var options cliOptions
@@ -468,8 +475,10 @@ func main() {
 	// initialize things
 	profile := vault.Profile{
 		Name: options.AwsProfile,
-		RoleARN: fmt.Sprintf("arn:aws:iam::%v:role/%v",
-			options.AwsAccountID, options.Role),
+		RoleARN: fmt.Sprintf("arn:%s:iam::%d:role/%s",
+			getPartition(options.AwsRegion),
+			options.AwsAccountID,
+			options.Role),
 		Region: options.AwsRegion,
 	}
 

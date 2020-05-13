@@ -1,6 +1,6 @@
 repos:
   - repo: git://github.com/golangci/golangci-lint
-    rev: v1.24.0
+    rev: v1.26.0
     hooks:
       - id: golangci-lint
 
@@ -17,6 +17,6 @@ repos:
       - id: trailing-whitespace
 
   - repo: git://github.com/igorshubovych/markdownlint-cli
-    rev: v0.22.0
+    rev: v0.23.0
     hooks:
       - id: markdownlint

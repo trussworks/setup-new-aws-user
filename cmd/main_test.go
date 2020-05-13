@@ -61,3 +61,12 @@ func TestGenerateQrCode(t *testing.T) {
 	err = generateQrCode("otpauth://totp/super@top?secret=secret", tempFile)
 	assert.NoError(t, err)
 }
+
+func TestGetPartition(t *testing.T) {
+	commPartition := getPartition("us-west-2")
+	assert.Equal(t, commPartition, "aws")
+	govPartition := getPartition("us-gov-west-1")
+	assert.Equal(t, govPartition, "aws-us-gov")
+	unknownPartition := getPartition("aws-under-the-sea")
+	assert.Equal(t, unknownPartition, "aws")
+}
