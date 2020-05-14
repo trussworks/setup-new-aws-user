@@ -40,7 +40,7 @@ Before running this tool, you will need to following pieces of information
 
 ## Running the tool
 
-1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam_user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
+1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
 2. Enter the access keys generated when prompted.
 
 3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
