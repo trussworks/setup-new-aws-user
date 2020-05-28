@@ -501,15 +501,14 @@ func main() {
 	}
 
 	baseProfile := vault.Profile{
-		Name:   options.AwsProfile,
+		Name: fmt.Sprintf("%s-base",
+			options.AwsProfile,
+		),
 		Region: options.AwsRegion,
 	}
 
 	roleProfile := vault.Profile{
-		Name: fmt.Sprintf("%s-%s",
-			options.AwsProfile,
-			options.Role,
-		),
+		Name: options.AwsProfile,
 		RoleARN: fmt.Sprintf("arn:%s:iam::%d:role/%s",
 			partition,
 			options.AwsAccountID,
