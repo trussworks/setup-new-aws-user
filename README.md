@@ -53,6 +53,25 @@ Before running this tool, you will need to following pieces of information
 aws-vault exec AWS_PROFILE -- aws sts get-session
 ```
 
+## How this tool modifies your ~/.aws/config
+
+While your AWS access keys are stored in a password protected keychain managed by `aws-vault`, the configuration for how you should access AWS accounts lives in ~/.aws/config. The setup-new-aws-user tool creates two profiles your `~/.aws/config`. The first is the base profile containing your long lived AWS Access Keys and is tied to your IAM user and MFA device. Since these keys are long lived, you should be rotating them regularly with `aws-vault rotate`. The second profile is the IAM role granting you elevated access to the AWS account. Typically these IAM roles are named `admin` or `engineer` and only uses temporary credentials leveraging AWS's Security Token Service (STS). Below is an example config generated from this tool.
+
+
+```ini
+[profile corp-id-base]
+mfa_serial=arn:aws:iam::123456789012:mfa/alice
+region=us-west-2
+output=json
+
+[profile corp-id]
+source_profile=corp-id-base
+mfa_serial=arn:aws:iam::123456789012:mfa/alice
+role_arn=arn:aws:iam::123456789012:role/admin
+region=us-west-2
+output=json
+```
+
 ## Development setup
 
 1. First, install these packages: `brew install pre-commit direnv go`

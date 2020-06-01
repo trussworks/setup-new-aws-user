@@ -46,7 +46,8 @@ type cliOptions struct {
 // User holds information for the AWS user being configured by this script
 type User struct {
 	Name            string
-	Profile         *vault.Profile
+	BaseProfile     *vault.Profile
+	RoleProfile     *vault.Profile
 	Output          string
 	Config          *vault.Config
 	AccessKeyID     string
@@ -121,7 +122,7 @@ func (u *User) newSession() (*session.Session, error) {
 				AccessKeyID:     u.AccessKeyID,
 				SecretAccessKey: u.SecretAccessKey,
 			}),
-			Region: aws.String(u.Profile.Region),
+			Region: aws.String(u.BaseProfile.Region),
 		},
 	})
 	if err != nil {
@@ -138,7 +139,7 @@ func (u *User) newMFASession() (*session.Session, error) {
 	}
 	stsClient := sts.New(basicSession)
 	getSessionTokenOutput, err := stsClient.GetSessionToken(&sts.GetSessionTokenInput{
-		SerialNumber: aws.String(u.Profile.MFASerial),
+		SerialNumber: aws.String(u.BaseProfile.MFASerial),
 		TokenCode:    aws.String(mfaToken),
 	})
 	if err != nil {
@@ -151,7 +152,7 @@ func (u *User) newMFASession() (*session.Session, error) {
 				SecretAccessKey: *getSessionTokenOutput.Credentials.SecretAccessKey,
 				SessionToken:    *getSessionTokenOutput.Credentials.SessionToken,
 			}),
-			Region: aws.String(u.Profile.Region),
+			Region: aws.String(u.BaseProfile.Region),
 		},
 	})
 	if err != nil {
@@ -180,14 +181,15 @@ func (u *User) CreateVirtualMFADevice() error {
 		return fmt.Errorf("unable to create virtual MFA: %w", err)
 	}
 
-	u.Profile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	u.BaseProfile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	u.RoleProfile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
 
 	// For the QR code, create a string that encodes:
 	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#VirtualMFADevice
 	content := fmt.Sprintf("otpauth://totp/%s@%s?secret=%s",
 		*mfaDeviceInput.VirtualMFADeviceName,
-		u.Profile.Name,
+		u.BaseProfile.Name,
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
@@ -245,7 +247,7 @@ func getMFATokenPair() MFATokenPair {
 // EnableVirtualMFADevice enables the user's MFA device
 func (u *User) EnableVirtualMFADevice() error {
 	log.Println("Enabling the virtual MFA device")
-	if u.Profile.MFASerial == "" {
+	if u.BaseProfile.MFASerial == "" {
 		return fmt.Errorf("profile MFA serial must be set")
 	}
 
@@ -260,7 +262,7 @@ func (u *User) EnableVirtualMFADevice() error {
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
 		AuthenticationCode2: aws.String(mfaTokenPair.Token2),
-		SerialNumber:        aws.String(u.Profile.MFASerial),
+		SerialNumber:        aws.String(u.BaseProfile.MFASerial),
 		UserName:            aws.String(u.Name),
 	}
 
@@ -327,16 +329,16 @@ func (u *User) RotateAccessKeys() error {
 // profile.
 func (u *User) AddVaultProfile() error {
 	creds := credentials.Value{AccessKeyID: u.AccessKeyID, SecretAccessKey: u.SecretAccessKey}
-	provider := &vault.KeyringProvider{Keyring: *u.Keyring, Profile: u.Profile.Name}
+	provider := &vault.KeyringProvider{Keyring: *u.Keyring, Profile: u.BaseProfile.Name}
 
 	err := provider.Store(creds)
 	if err != nil {
 		return fmt.Errorf("unable to store credentials: %w", err)
 	}
 
-	log.Printf("Added credentials to profile %q in vault", u.Profile.Name)
+	log.Printf("Added credentials to profile %q in vault", u.BaseProfile.Name)
 
-	err = deleteSession(u.Profile.Name, u.Config, u.Keyring)
+	err = deleteSession(u.BaseProfile.Name, u.Config, u.Keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -352,19 +354,38 @@ func (u *User) UpdateAWSConfigFile() error {
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
-	// add the profile
-	sectionName := fmt.Sprintf("profile %s", u.Profile.Name)
-	section, err := iniFile.NewSection(sectionName)
+	// add the base profile
+	baseSectionName := fmt.Sprintf("profile %s", u.BaseProfile.Name)
+	baseSection, err := iniFile.NewSection(baseSectionName)
 	if err != nil {
-		return fmt.Errorf("error creating section %q: %w", u.Profile.Name, err)
+		return fmt.Errorf("error creating section %q: %w", u.BaseProfile.Name, err)
 	}
-	if err = section.ReflectFrom(&u.Profile); err != nil {
+	if err = baseSection.ReflectFrom(&u.BaseProfile); err != nil {
 		return fmt.Errorf("error mapping profile to ini file: %w", err)
 	}
-	_, err = section.NewKey("output", u.Output)
+	_, err = baseSection.NewKey("output", u.Output)
 	if err != nil {
 		return fmt.Errorf("unable to add output key: %w", err)
 	}
+
+	// add the role profile
+	roleSectionName := fmt.Sprintf("profile %s", u.RoleProfile.Name)
+	roleSection, err := iniFile.NewSection(roleSectionName)
+	if err != nil {
+		return fmt.Errorf("error creating section %q: %w", u.RoleProfile.Name, err)
+	}
+	_, err = roleSection.NewKey("source_profile", u.BaseProfile.Name)
+	if err != nil {
+		return fmt.Errorf("unable to add source profile: %w", err)
+	}
+	if err = roleSection.ReflectFrom(&u.RoleProfile); err != nil {
+		return fmt.Errorf("error mapping profile to ini file: %w", err)
+	}
+	_, err = roleSection.NewKey("output", u.Output)
+	if err != nil {
+		return fmt.Errorf("unable to add output key: %w", err)
+	}
+
 	// save it back to the aws config path
 	return iniFile.SaveTo(u.Config.Path)
 }
@@ -372,7 +393,7 @@ func (u *User) UpdateAWSConfigFile() error {
 // RemoveVaultSession removes the aws-vault session for the profile.
 func (u *User) RemoveVaultSession() error {
 	log.Printf("Removing aws-vault session")
-	err := deleteSession(u.Profile.Name, u.Config, u.Keyring)
+	err := deleteSession(u.BaseProfile.Name, u.Config, u.Keyring)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -479,7 +500,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	profile := vault.Profile{
+	baseProfile := vault.Profile{
+		Name: fmt.Sprintf("%s-base",
+			options.AwsProfile,
+		),
+		Region: options.AwsRegion,
+	}
+
+	roleProfile := vault.Profile{
 		Name: options.AwsProfile,
 		RoleARN: fmt.Sprintf("arn:%s:iam::%d:role/%s",
 			partition,
@@ -510,14 +538,19 @@ func main() {
 		log.Fatal(err)
 	}
 	user := User{
-		Name:       options.IAMUser,
-		Profile:    &profile,
-		Output:     options.Output,
-		Config:     config,
-		QrTempFile: tempfile,
-		Keyring:    keyring,
+		Name:        options.IAMUser,
+		BaseProfile: &baseProfile,
+		RoleProfile: &roleProfile,
+		Output:      options.Output,
+		Config:      config,
+		QrTempFile:  tempfile,
+		Keyring:     keyring,
 	}
-	err = checkExistingAWSProfile(profile.Name, config)
+	err = checkExistingAWSProfile(baseProfile.Name, config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = checkExistingAWSProfile(roleProfile.Name, config)
 	if err != nil {
 		log.Fatal(err)
 	}

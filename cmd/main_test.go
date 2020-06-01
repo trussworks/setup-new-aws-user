@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -30,26 +29,52 @@ func TestExistingAWSProfile(t *testing.T) {
 	f := newConfigFile(t, defaultConfig)
 	defer os.Remove(f)
 	config, _ := vault.LoadConfig(f)
-	profile := vault.Profile{
-		Name: "test",
-		RoleARN: fmt.Sprintf("arn:aws:iam::%v:role/%v",
-			"123456789", "engineer"),
+	baseProfile := vault.Profile{
+		Name:   "test",
 		Region: "us-west-2",
 	}
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
 	user := User{
-		Name:       "test",
-		Profile:    &profile,
-		Output:     "json",
-		Config:     config,
-		QrTempFile: nil,
-		Keyring:    keyring,
+		Name:        "test",
+		BaseProfile: &baseProfile,
+		Output:      "json",
+		Config:      config,
+		QrTempFile:  nil,
+		Keyring:     keyring,
 	}
 
-	err = checkExistingAWSProfile(profile.Name, user.Config)
+	err = checkExistingAWSProfile(baseProfile.Name, user.Config)
 	assert.Error(t, err)
 	err = checkExistingAWSProfile("missing", user.Config)
+	assert.NoError(t, err)
+}
+
+func TestUpdateAWSConfigFile(t *testing.T) {
+	f := newConfigFile(t, defaultConfig)
+	defer os.Remove(f)
+	baseProfile := vault.Profile{
+		Name:   "test-base",
+		Region: "us-west-2",
+	}
+	roleProfile := vault.Profile{
+		Name:   "test-role",
+		Region: "us-west-2",
+	}
+
+	config, _ := vault.LoadConfig(f)
+	keyring, err := getKeyring("test")
+	assert.NoError(t, err)
+	user := User{
+		Name:        "test-user",
+		BaseProfile: &baseProfile,
+		RoleProfile: &roleProfile,
+		Output:      "json",
+		Config:      config,
+		QrTempFile:  nil,
+		Keyring:     keyring,
+	}
+	err = user.UpdateAWSConfigFile()
 	assert.NoError(t, err)
 }
 
