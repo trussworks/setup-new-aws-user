@@ -450,7 +450,7 @@ func generateQrCode(payload string, tempFile *os.File) error {
 
 	// Write the QR PNG to the Temp File
 	if _, err := tempFile.Write(qr); err != nil {
-		tempFile.Close()
+		_ = tempFile.Close()
 		return err
 	}
 	return nil
@@ -542,7 +542,12 @@ func main() {
 		log.Fatal(err)
 	}
 	// Cleanup after ourselves
-	defer os.Remove(tempfile.Name())
+	defer func() {
+		errRemove := os.Remove(tempfile.Name())
+		if errRemove != nil {
+			log.Fatal(errRemove)
+		}
+	}()
 
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
