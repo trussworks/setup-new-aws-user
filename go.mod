@@ -20,3 +20,8 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/ini.v1 v1.57.0
 )
+
+// Update to ignore compiler warnings on macOS catalina
+// https://github.com/keybase/go-keychain/pull/55
+// https://github.com/99designs/aws-vault/pull/427
+replace github.com/keybase/go-keychain => github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4

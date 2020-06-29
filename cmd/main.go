@@ -25,6 +25,9 @@ import (
 const maxNumAccessKeys = 2
 const maxMFATokenPromptAttempts = 5
 
+// version is the published version of the utility
+var version string
+
 var validate *validator.Validate
 
 // MFATokenPair holds two MFA tokens for enabling virtual
@@ -41,6 +44,7 @@ type cliOptions struct {
 	IAMUser      string `required:"true" long:"iam-user" description:"The IAM user name"`
 	Role         string `required:"true" long:"role" description:"The user role type"`
 	Output       string `long:"output" default:"json" description:"The AWS CLI output format"`
+	Version      bool   `long:"version" description:"Print the version and exit"`
 }
 
 // User holds information for the AWS user being configured by this script
@@ -446,7 +450,7 @@ func generateQrCode(payload string, tempFile *os.File) error {
 
 	// Write the QR PNG to the Temp File
 	if _, err := tempFile.Write(qr); err != nil {
-		tempFile.Close()
+		_ = tempFile.Close()
 		return err
 	}
 	return nil
@@ -485,13 +489,29 @@ func getPartition(region string) (string, error) {
 func main() {
 	// parse command line flags
 	var options cliOptions
-	parser := flags.NewParser(&options, flags.Default)
+	parser := flags.NewParser(&options, flags.HelpFlag|flags.PassDoubleDash)
 
-	_, err := parser.Parse()
-	if err != nil {
-		log.Fatal(err)
+	// Parse the command line flags
+	_, errParse := parser.Parse()
+
+	// Print the version and exit
+	if options.Version {
+		// Disable output not related to version before printing
+		log.SetFlags(0)
+		if len(version) == 0 {
+			log.Println("development")
+		} else {
+			log.Println(version)
+		}
+		os.Exit(0)
 	}
 
+	// Manage parse errors after checking for version
+	if errParse != nil {
+		log.Fatal(errParse)
+	}
+
+	// Validator used to validate input options for MFA
 	validate = validator.New()
 
 	// initialize things
@@ -522,7 +542,12 @@ func main() {
 		log.Fatal(err)
 	}
 	// Cleanup after ourselves
-	defer os.Remove(tempfile.Name())
+	defer func() {
+		errRemove := os.Remove(tempfile.Name())
+		if errRemove != nil {
+			log.Fatal(errRemove)
+		}
+	}()
 
 	config, err := vault.LoadConfigFromEnv()
 	if err != nil {
