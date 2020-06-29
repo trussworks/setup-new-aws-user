@@ -30,7 +30,7 @@ const (
 	OutputFlag = "output"
 
 	// VerboseFlag is the Verbose Flag
-	VerboseFlag string = "debug-logging"
+	VerboseFlag string = "verbose"
 )
 
 func stringSliceContains(stringSlice []string, value string) bool {
