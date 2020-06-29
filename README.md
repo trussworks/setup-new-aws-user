@@ -109,7 +109,7 @@ use the real AWS account ID.
 Example:
 
 ```shell
-go run cmd/main.go setup --iam-role engineer --iam-user testuser --aws-profile test-profile-name --aws-account-id 123456789012
+go run ./cmd setup --iam-role engineer --iam-user testuser --aws-profile test-profile-name --aws-account-id 123456789012
 ```
 
 After running the script, try a command to ensure the new profile works as
