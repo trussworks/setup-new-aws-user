@@ -16,7 +16,7 @@ bin/setup-new-aws-user: ## Build setup-new-aws-user
 	go build -ldflags "$(LDFLAGS) -X main.version=${VERSION}" -o bin/setup-new-aws-user ./cmd/
 
 .PHONY: test
-test: pre_commit_tests
+test:
 	go test ./cmd/...
 
 .PHONY: clean

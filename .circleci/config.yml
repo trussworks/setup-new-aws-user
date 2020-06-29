@@ -14,7 +14,10 @@ jobs:
             - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
             - go-mod-sources-v1-{{ checksum "go.sum" }}
       - run:
-          name: Run pre-commit and Go tests
+          name: Run pre-commit
+          command: pre-commit run -a
+      - run:
+          name: Run Go tests
           command: make test
       - save_cache:
           key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
