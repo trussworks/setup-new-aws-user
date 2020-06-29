@@ -45,7 +45,7 @@ func setupUserInitFlags(flag *pflag.FlagSet) {
 	flag.String(AWSAccountIDFlag, "", "The AWS account ID")
 	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
-	flag.String(OutputFlag, "json", "The AWS CLI output format 'text' or 'json'")
+	flag.String(OutputFlag, "json", "The AWS CLI output format")
 
 	// Verbose
 	flag.BoolP(VerboseFlag, "v", false, "log messages at the debug level.")
@@ -171,7 +171,7 @@ func (u *User) newSession() (*session.Session, error) {
 }
 
 func (u *User) newMFASession(logger *log.Logger) (*session.Session, error) {
-	mfaToken := promptMFAtoken("", logger)
+	mfaToken := promptMFAtoken("Third ", logger)
 	basicSession, err := u.newSession()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create new session: %w", err)
@@ -254,7 +254,7 @@ func promptMFAtoken(messagePrefix string, logger *log.Logger) string {
 		}
 		err = validate.Var(t, "numeric,len=6")
 		if err != nil {
-			fmt.Println("MFA token must be 6 digits. Please try again.")
+			logger.Println("MFA token must be 6 digits. Please try again.")
 			continue
 		}
 		token = t
@@ -265,7 +265,7 @@ func promptMFAtoken(messagePrefix string, logger *log.Logger) string {
 func getMFATokenPair(logger *log.Logger) MFATokenPair {
 	var mfaTokenPair MFATokenPair
 	for attempts := maxMFATokenPromptAttempts; attempts > 0; attempts-- {
-		fmt.Printf("Two unique MFA tokens needed to activate MFA device (%d attempts remaining)\n", attempts)
+		logger.Printf("Two unique MFA tokens needed to activate MFA device (%d attempts remaining)\n", attempts)
 		authToken1 := promptMFAtoken("First ", logger)
 		authToken2 := promptMFAtoken("Second ", logger)
 
@@ -317,6 +317,7 @@ func (u *User) EnableVirtualMFADevice(logger *log.Logger) error {
 func (u *User) RotateAccessKeys(logger *log.Logger) error {
 	logger.Println("Rotating AWS access keys")
 
+	logger.Println("A new unique MFA token is needed to rotate the AWS access keys")
 	sess, err := u.newMFASession(logger)
 	if err != nil {
 		return fmt.Errorf("unable to get mfa session: %w", err)
@@ -504,7 +505,7 @@ func openQrCode(tempFile *os.File) error {
 }
 
 func checkExistingAWSProfile(profileName string, config *vault.Config, logger *log.Logger) error {
-	logger.Println("Checking whether profile exists in AWS config file")
+	logger.Printf("Checking whether profile %q exists in AWS config file\n", profileName)
 	_, exists := config.Profile(profileName)
 	if exists {
 		return fmt.Errorf("Profile already exists in AWS config file: %s", profileName)
