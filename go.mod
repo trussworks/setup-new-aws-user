@@ -5,17 +5,26 @@ go 1.14
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20191030013236-08380e6561cc
 	github.com/99designs/keyring v1.1.5
-	github.com/aws/aws-sdk-go v1.32.11
+	github.com/aws/aws-sdk-go v1.32.12
+	github.com/danieljoos/wincred v1.1.0 // indirect
+	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
-	github.com/jessevdk/go-flags v1.4.0
-	github.com/keybase/go-keychain v0.0.0-20191114153608-ccd67945d59e // indirect
+	github.com/keybase/go-keychain v0.0.0-20200502122510-cda31fe0c86d // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
+	github.com/mitchellh/mapstructure v1.3.2 // indirect
+	github.com/pelletier/go-toml v1.8.0 // indirect
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
-	github.com/skip2/go-qrcode v0.0.0-20191027152451-9434209cb086
-	github.com/smartystreets/goconvey v1.6.4 // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+	github.com/spf13/afero v1.3.1 // indirect
+	github.com/spf13/cast v1.3.1 // indirect
+	github.com/spf13/cobra v1.0.0
+	github.com/spf13/jwalterweatherman v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/crypto v0.0.0-20191119213627-4f8c1d86b1ba // indirect
-	golang.org/x/sys v0.0.0-20191120155948-bd437916bb0e // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
+	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
+	golang.org/x/text v0.3.3 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/ini.v1 v1.57.0

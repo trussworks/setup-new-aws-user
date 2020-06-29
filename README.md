@@ -40,9 +40,8 @@ Before running this tool, you will need to following pieces of information
 
 ## Running the tool
 
-1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
+1. Run the setup-new-user - `setup-new-aws-user setup --iam-role <IAM_ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
 2. Enter the access keys generated when prompted.
-
 3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
 4. You'll then need to create a new entry in your 1Password account configure it with a TOTP field.
 5. Use 1Password to scan the QR code and hit save. New TOTP tokens should generate every 30 seconds.
@@ -102,7 +101,7 @@ use the real AWS account ID.
 Example:
 
 ```shell
-go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
+go run cmd/main.go setup --iam-role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
 ```
 
 After running the script, try a command to ensure the new profile works as
