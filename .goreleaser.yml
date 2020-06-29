@@ -1,3 +1,5 @@
+env:
+  - GO111MODULE=on
 before:
   hooks:
     - go mod download
@@ -18,14 +20,14 @@ brews:
       name: trussworks-infra
       email: infra+github@truss.works
 archives:
-- replacements:
-    darwin: Darwin
-    linux: Linux
-    windows: Windows
-    386: i386
-    amd64: x86_64
+  -
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      amd64: x86_64
 checksum:
   name_template: 'checksums.txt'
+  algorithm: sha256
 snapshot:
   name_template: "{{ .Tag }}-next"
 changelog:
