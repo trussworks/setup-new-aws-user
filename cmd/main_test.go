@@ -27,7 +27,10 @@ func newConfigFile(t *testing.T, b []byte) string {
 
 func TestExistingAWSProfile(t *testing.T) {
 	f := newConfigFile(t, defaultConfig)
-	defer os.Remove(f)
+	defer func() {
+		errRemove := os.Remove(f)
+		assert.NoError(t, errRemove)
+	}()
 	config, _ := vault.LoadConfig(f)
 	baseProfile := vault.Profile{
 		Name:   "test",
@@ -52,7 +55,10 @@ func TestExistingAWSProfile(t *testing.T) {
 
 func TestUpdateAWSConfigFile(t *testing.T) {
 	f := newConfigFile(t, defaultConfig)
-	defer os.Remove(f)
+	defer func() {
+		errRemove := os.Remove(f)
+		assert.NoError(t, errRemove)
+	}()
 	baseProfile := vault.Profile{
 		Name:   "test-base",
 		Region: "us-west-2",
@@ -81,7 +87,10 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 func TestGenerateQrCode(t *testing.T) {
 	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
 	assert.NoError(t, err)
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		errRemove := os.Remove(tempFile.Name())
+		assert.NoError(t, errRemove)
+	}()
 
 	err = generateQrCode("otpauth://totp/super@top?secret=secret", tempFile)
 	assert.NoError(t, err)
