@@ -1,9 +1,13 @@
+# Settings found in https://dependabot.com/docs/config-file/
 version: 1
 update_configs:
-  # Keep go modules up to date, batching pull requests weekly
   - package_manager: "go:modules"
     directory: "/"
     update_schedule: "weekly"
-    # Apply dependencies label to PRs
+    automerged_updates:
+      - match:
+          dependency_type: "all"
+          update_type: "semver:minor"
     default_labels:
-      - "dependencies"
+      - dependencies
+      - automerge
