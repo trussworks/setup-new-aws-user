@@ -235,6 +235,9 @@ func (u *User) GetMFADevice(logger *log.Logger) error {
 	if len(mfaDeviceOutput.MFADevices) == 0 {
 		return errors.New("no MFA devices registered")
 	}
+	if len(mfaDeviceOutput.MFADevices) > 1 {
+		return errors.New("more than one MFA device registered, no way to choose")
+	}
 	mfaDevice := mfaDeviceOutput.MFADevices[0]
 
 	u.BaseProfile.MFASerial = *mfaDevice.SerialNumber
