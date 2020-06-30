@@ -433,44 +433,52 @@ func (sc *SetupConfig) AddVaultProfile() error {
 	return nil
 }
 
+// UpdateAWSProfile adds a single AWS profile to the AWS config file
+func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile, sourceProfile *vault.ProfileSection) error {
+	sc.Logger.Printf("Adding the profile %s to the AWS config file", profile.Name)
+
+	sectionName := fmt.Sprintf("profile %s", profile.Name)
+	section, err := iniFile.NewSection(sectionName)
+	if err != nil {
+		return fmt.Errorf("error creating section %q: %w", profile.Name, err)
+	}
+
+	// Add the source profile when provided
+	if sourceProfile != nil {
+		_, err = section.NewKey("source_profile", sc.BaseProfile.Name)
+		if err != nil {
+			return fmt.Errorf("unable to add source profile: %w", err)
+		}
+	}
+
+	if err = section.ReflectFrom(&profile); err != nil {
+		return fmt.Errorf("error mapping profile to ini file: %w", err)
+	}
+	_, err = section.NewKey("output", sc.Output)
+	if err != nil {
+		return fmt.Errorf("unable to add output key: %w", err)
+	}
+	return nil
+}
+
 // UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
 func (sc *SetupConfig) UpdateAWSConfigFile() error {
 	sc.Logger.Printf("Updating the AWS config file: %s", sc.Config.Path)
 	// load the ini file
 	iniFile, err := ini.Load(sc.Config.Path)
+
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
-	// add the base profile
-	baseSectionName := fmt.Sprintf("profile %s", sc.BaseProfile.Name)
-	baseSection, err := iniFile.NewSection(baseSectionName)
+	// Add the base profile
+	err = sc.UpdateAWSProfile(iniFile, sc.BaseProfile, nil)
 	if err != nil {
-		return fmt.Errorf("error creating section %q: %w", sc.BaseProfile.Name, err)
+		return fmt.Errorf("could not add base profile: %w", err)
 	}
-	if err = baseSection.ReflectFrom(&sc.BaseProfile); err != nil {
-		return fmt.Errorf("error mapping profile to ini file: %w", err)
-	}
-	_, err = baseSection.NewKey("output", sc.Output)
+	// Add the role profile with base as the source profile
+	err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, sc.BaseProfile)
 	if err != nil {
-		return fmt.Errorf("unable to add output key: %w", err)
-	}
-
-	// add the role profile
-	roleSectionName := fmt.Sprintf("profile %s", sc.RoleProfile.Name)
-	roleSection, err := iniFile.NewSection(roleSectionName)
-	if err != nil {
-		return fmt.Errorf("error creating section %q: %w", sc.RoleProfile.Name, err)
-	}
-	_, err = roleSection.NewKey("source_profile", sc.BaseProfile.Name)
-	if err != nil {
-		return fmt.Errorf("unable to add source profile: %w", err)
-	}
-	if err = roleSection.ReflectFrom(&sc.RoleProfile); err != nil {
-		return fmt.Errorf("error mapping profile to ini file: %w", err)
-	}
-	_, err = roleSection.NewKey("output", sc.Output)
-	if err != nil {
-		return fmt.Errorf("unable to add output key: %w", err)
+		return fmt.Errorf("could not add role profile: %w", err)
 	}
 
 	// save it back to the aws config path
