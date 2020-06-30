@@ -433,14 +433,21 @@ func (sc *SetupConfig) AddVaultProfile() error {
 	return nil
 }
 
-// UpdateAWSProfile adds a single AWS profile to the AWS config file
+// UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
 func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile, sourceProfile *vault.ProfileSection) error {
 	sc.Logger.Printf("Adding the profile %s to the AWS config file", profile.Name)
 
 	sectionName := fmt.Sprintf("profile %s", profile.Name)
-	section, err := iniFile.NewSection(sectionName)
-	if err != nil {
-		return fmt.Errorf("error creating section %q: %w", profile.Name, err)
+
+	// Get or create section before updating
+	var err error
+	var section *ini.Section
+	section = iniFile.Section(sectionName)
+	if section == nil {
+		section, err = iniFile.NewSection(sectionName)
+		if err != nil {
+			return fmt.Errorf("error creating section %q: %w", profile.Name, err)
+		}
 	}
 
 	// Add the source profile when provided
@@ -471,13 +478,11 @@ func (sc *SetupConfig) UpdateAWSConfigFile() error {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
 	// Add the base profile
-	err = sc.UpdateAWSProfile(iniFile, sc.BaseProfile, nil)
-	if err != nil {
+	if err = sc.UpdateAWSProfile(iniFile, sc.BaseProfile, nil); err != nil {
 		return fmt.Errorf("could not add base profile: %w", err)
 	}
 	// Add the role profile with base as the source profile
-	err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, sc.BaseProfile)
-	if err != nil {
+	if err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, sc.BaseProfile); err != nil {
 		return fmt.Errorf("could not add role profile: %w", err)
 	}
 
