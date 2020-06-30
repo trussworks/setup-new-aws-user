@@ -436,7 +436,6 @@ func (sc *SetupConfig) AddVaultProfile() error {
 // UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
 func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile, sourceProfile *vault.ProfileSection) error {
 	sc.Logger.Printf("Adding the profile %s to the AWS config file", profile.Name)
-
 	sectionName := fmt.Sprintf("profile %s", profile.Name)
 
 	// Get or create section before updating
