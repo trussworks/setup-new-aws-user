@@ -2,12 +2,16 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/99designs/aws-vault/vault"
 	"github.com/stretchr/testify/assert"
 )
+
+// Test logger
+var logger = log.New(os.Stdout, "", log.LstdFlags)
 
 var defaultConfig = []byte(`[profile test]
 region=us-west-2
@@ -47,9 +51,9 @@ func TestExistingAWSProfile(t *testing.T) {
 		Keyring:     keyring,
 	}
 
-	err = checkExistingAWSProfile(baseProfile.Name, user.Config)
+	err = checkExistingAWSProfile(baseProfile.Name, user.Config, logger)
 	assert.Error(t, err)
-	err = checkExistingAWSProfile("missing", user.Config)
+	err = checkExistingAWSProfile("missing", user.Config, logger)
 	assert.NoError(t, err)
 }
 
@@ -80,7 +84,7 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 		QrTempFile:  nil,
 		Keyring:     keyring,
 	}
-	err = user.UpdateAWSConfigFile()
+	err = user.UpdateAWSConfigFile(logger)
 	assert.NoError(t, err)
 }
 

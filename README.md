@@ -27,22 +27,23 @@ brew cask install aws-vault
 
 Before running this tool, you will need to following pieces of information
 
-* IAM role - This is the IAM Role with permissions allowing access to AWS APIs
-  and services. This is usually something like `admin` or `engineer`.
-* IAM user name - This is your IAM username.
+* IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
+  and services. This is usually something like `admin` or `engineer`. Use the flag
+  `--iam-role` with this value.
+* IAM user name - This is your IAM username. Use the flag `--iam-user` with this value.
 * AWS profile - This is the name that populates your `~/.aws/config` profile
   name. It is usually the name of the aws account alias you are trying to access.
+  Use the flag name `--aws-profile` with this value.
 * AWS account Id - This is the 12-digit account number of the AWS account you
-  are trying to access.
+  are trying to access. Use the flag `--aws-account-id` with this value.
 * Temporary AWS access keys - These should be given to you by an administrator
   of the AWS account you are trying to access. The tool will prompt you for
   the access key id and secret access key.
 
 ## Running the tool
 
-1. Run the setup-new-user - `setup-new-aws-user --role <IAM_ROLE> --iam-user <USER> --profile=<AWS_PROFILE> --account-id=<AWS_ACCOUNT_ID>`
+1. Run the setup-new-user script - `setup-new-aws-user setup --iam-role <IAM_ROLE> --iam-user <USER> --aws-profile=<AWS_PROFILE> --aws-account-id=<AWS_ACCOUNT_ID>`
 2. Enter the access keys generated when prompted.
-
 3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
 4. You'll then need to create a new entry in your 1Password account configure it with a TOTP field.
 5. Use 1Password to scan the QR code and hit save. New TOTP tokens should generate every 30 seconds.
@@ -50,13 +51,18 @@ Before running this tool, you will need to following pieces of information
 7. Once the tool has completed, you should be able to access the AWS account. You can run the following command filling in the AWS_PROFILE value
 
 ```shell
-aws-vault exec AWS_PROFILE -- aws sts get-session
+aws-vault exec $AWS_PROFILE -- aws sts get-session
 ```
 
 ## How this tool modifies your ~/.aws/config
 
-While your AWS access keys are stored in a password protected keychain managed by `aws-vault`, the configuration for how you should access AWS accounts lives in ~/.aws/config. The setup-new-aws-user tool creates two profiles your `~/.aws/config`. The first is the base profile containing your long lived AWS Access Keys and is tied to your IAM user and MFA device. Since these keys are long lived, you should be rotating them regularly with `aws-vault rotate`. The second profile is the IAM role granting you elevated access to the AWS account. Typically these IAM roles are named `admin` or `engineer` and only uses temporary credentials leveraging AWS's Security Token Service (STS). Below is an example config generated from this tool.
-
+While your AWS access keys are stored in a password protected keychain managed by `aws-vault`, the configuration for
+how you should access AWS accounts lives in ~/.aws/config. The setup-new-aws-user tool creates two profiles your
+`~/.aws/config`. The first is the base profile containing your long lived AWS Access Keys and is tied to your IAM user
+and MFA device. Since these keys are long lived, you should be rotating them regularly with `aws-vault rotate`.
+The second profile is the IAM role granting you elevated access to the AWS account. Typically these IAM roles are
+named `admin` or `engineer` and only uses temporary credentials leveraging AWS's Security Token Service (STS).
+Below is an example config generated from this tool.
 
 ```ini
 [profile corp-id-base]
@@ -86,6 +92,7 @@ output=json
 Run pre-commit and Go tests
 
 ```shell
+pre-commit run -a
 make test
 ```
 
@@ -102,7 +109,7 @@ use the real AWS account ID.
 Example:
 
 ```shell
-go run cmd/main.go --role engineer --iam-user testuser --account-id 123456789012  --profile test-profile-name
+go run ./cmd setup --iam-role engineer --iam-user testuser --aws-profile test-profile-name --aws-account-id 123456789012
 ```
 
 After running the script, try a command to ensure the new profile works as
