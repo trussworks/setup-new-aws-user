@@ -78,6 +78,16 @@ region=us-west-2
 output=json
 ```
 
+### MFA Management
+
+This tool will help create and enable a virtual MFA device. The interface for the MFA device is a QR code
+which will be shown to the user during setup. This QR code can be used with a password manager to provide the
+One Time Passwords (OTP) values asked for in the script.
+
+In the case where the user has a virtual MFA device already set up they can choose not to provision a new one.
+This is done by issuing the `--no-mfa` flag on the command line in conjunction with the regular command from
+above.
+
 ## Development setup
 
 1. First, install these packages: `brew install pre-commit direnv go`
