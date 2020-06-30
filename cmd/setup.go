@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -47,8 +48,11 @@ func setupUserInitFlags(flag *pflag.FlagSet) {
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
 	flag.String(OutputFlag, "json", "The AWS CLI output format")
 
+	// No MFA Setup
+	flag.Bool(NoMFAFlag, false, "When present do not provision an MFA device, assume one exists")
+
 	// Verbose
-	flag.BoolP(VerboseFlag, "v", false, "log messages at the debug level.")
+	flag.BoolP(VerboseFlag, "v", false, "log messages at the debug level")
 
 	flag.SortFlags = false
 }
@@ -93,6 +97,7 @@ type User struct {
 	SecretAccessKey string
 	QrTempFile      *os.File
 	Keyring         *keyring.Keyring
+	NoMFA           bool
 }
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
@@ -108,14 +113,21 @@ func (u *User) Setup(logger *log.Logger) {
 		logger.Fatal(err)
 	}
 
-	err = u.CreateVirtualMFADevice(logger)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	if u.NoMFA {
+		err = u.GetMFADevice(logger)
+		if err != nil {
+			logger.Fatal(err)
+		}
+	} else {
+		err = u.CreateVirtualMFADevice(logger)
+		if err != nil {
+			logger.Fatal(err)
+		}
 
-	err = u.EnableVirtualMFADevice(logger)
-	if err != nil {
-		logger.Fatal(err)
+		err = u.EnableVirtualMFADevice(logger)
+		if err != nil {
+			logger.Fatal(err)
+		}
 	}
 
 	err = u.UpdateAWSConfigFile(logger)
@@ -198,6 +210,37 @@ func (u *User) newMFASession(logger *log.Logger) (*session.Session, error) {
 		return nil, fmt.Errorf("unable to get MFA session: %w", err)
 	}
 	return mfaSession, nil
+}
+
+// GetMFADevice gets the user's existing virtual MFA device and updates the
+// MFA serial in the profile field.
+func (u *User) GetMFADevice(logger *log.Logger) error {
+	logger.Println("Getting the existing MFA device...")
+
+	sess, err := u.newSession()
+	if err != nil {
+		return fmt.Errorf("unable to get new session: %w", err)
+	}
+	svc := iam.New(sess)
+
+	mfaDeviceInput := &iam.ListMFADevicesInput{
+		UserName: aws.String(u.Name),
+	}
+
+	mfaDeviceOutput, err := svc.ListMFADevices(mfaDeviceInput)
+	if err != nil {
+		return fmt.Errorf("unable to get MFA: %w", err)
+	}
+
+	if len(mfaDeviceOutput.MFADevices) == 0 {
+		return errors.New("no MFA devices registered")
+	}
+	mfaDevice := mfaDeviceOutput.MFADevices[0]
+
+	u.BaseProfile.MFASerial = *mfaDevice.SerialNumber
+	u.RoleProfile.MFASerial = *mfaDevice.SerialNumber
+
+	return nil
 }
 
 // CreateVirtualMFADevice creates the user's virtual MFA device and updates the
@@ -572,6 +615,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	iamUser := v.GetString(IAMUserFlag)
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
+	noMFA := v.GetBool(NoMFAFlag)
 
 	// Validator used to validate input options for MFA
 	validate = validator.New()
@@ -628,6 +672,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		Config:      config,
 		QrTempFile:  tempfile,
 		Keyring:     keyring,
+		NoMFA:       noMFA,
 	}
 	err = checkExistingAWSProfile(baseProfile.Name, config, logger)
 	if err != nil {

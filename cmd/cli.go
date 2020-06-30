@@ -27,7 +27,10 @@ const (
 	IAMRoleFlag string = "iam-role"
 
 	// OutputFlag is the Output Flag
-	OutputFlag = "output"
+	OutputFlag string = "output"
+
+	// NoMFAFlag indicates that no MFA device should be configured as one exists
+	NoMFAFlag string = "no-mfa"
 
 	// VerboseFlag is the Verbose Flag
 	VerboseFlag string = "verbose"
