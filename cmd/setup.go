@@ -90,8 +90,14 @@ func setupUserCheckConfig(v *viper.Viper) error {
 type SetupConfig struct {
 	Logger          *log.Logger
 	Name            string
+	Role            string
+	Region          string
+	Partition       string
+	BaseProfileName *string
 	BaseProfile     *vault.ProfileSection
+	RoleProfileName *string
 	RoleProfile     *vault.ProfileSection
+	NewProfiles     *[]string
 	Output          string
 	Config          *vault.ConfigFile
 	AccessKeyID     string
@@ -434,8 +440,8 @@ func (sc *SetupConfig) AddVaultProfile() error {
 }
 
 // UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
-func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile, sourceProfile *vault.ProfileSection) error {
-	sc.Logger.Printf("Adding the profile %s to the AWS config file", profile.Name)
+func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string) error {
+	sc.Logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
 	sectionName := fmt.Sprintf("profile %s", profile.Name)
 
 	// Get or create section before updating
@@ -451,7 +457,7 @@ func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile, sourceProfil
 
 	// Add the source profile when provided
 	if sourceProfile != nil {
-		_, err = section.NewKey("source_profile", sc.BaseProfile.Name)
+		_, err = section.NewKey("source_profile", *sourceProfile)
 		if err != nil {
 			return fmt.Errorf("unable to add source profile: %w", err)
 		}
@@ -481,7 +487,7 @@ func (sc *SetupConfig) UpdateAWSConfigFile() error {
 		return fmt.Errorf("could not add base profile: %w", err)
 	}
 	// Add the role profile with base as the source profile
-	if err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, sc.BaseProfile); err != nil {
+	if err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, &sc.BaseProfile.Name); err != nil {
 		return fmt.Errorf("could not add role profile: %w", err)
 	}
 
@@ -630,10 +636,9 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 
+	baseProfileName := fmt.Sprintf("%s-base", awsVaultProfile)
 	baseProfile := vault.ProfileSection{
-		Name: fmt.Sprintf("%s-base",
-			awsVaultProfile,
-		),
+		Name:   baseProfileName,
 		Region: awsRegion,
 	}
 
@@ -669,15 +674,20 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 	setupConfig := SetupConfig{
-		Logger:      logger,
-		Name:        iamUser,
-		BaseProfile: &baseProfile,
-		RoleProfile: &roleProfile,
-		Output:      output,
-		Config:      config,
-		QrTempFile:  tempfile,
-		Keyring:     keyring,
-		NoMFA:       noMFA,
+		Logger:          logger,
+		Name:            iamUser,
+		Role:            iamRole,
+		Region:          awsRegion,
+		Partition:       partition,
+		BaseProfileName: &baseProfileName,
+		BaseProfile:     &baseProfile,
+		RoleProfileName: &awsVaultProfile,
+		RoleProfile:     &roleProfile,
+		Output:          output,
+		Config:          config,
+		QrTempFile:      tempfile,
+		Keyring:         keyring,
+		NoMFA:           noMFA,
 	}
 	setupConfig.Setup()
 

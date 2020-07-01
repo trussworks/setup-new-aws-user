@@ -20,6 +20,8 @@ const (
 	VaultAWSKeychainNameDefault string = "login"
 	// VaultAWSProfileFlag is the aws-vault profile name Flag
 	VaultAWSProfileFlag string = "aws-profile"
+	// VaultAWSNewProfileFlag is the aws-vault flag to add new profiles
+	VaultAWSNewProfileFlag string = "aws-new-profile"
 
 	// IAMUserFlag is the IAM User name Flag
 	IAMUserFlag string = "iam-user"

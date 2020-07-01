@@ -33,6 +33,16 @@ func main() {
 	setupUserInitFlags(setupUserCommand.Flags())
 	root.AddCommand(setupUserCommand)
 
+	addProfileCommand := &cobra.Command{
+		Use:                   "add-profile [flags]",
+		DisableFlagsInUseLine: true,
+		Short:                 "Add new AWS config profile",
+		Long:                  "Add new AWS config profile",
+		RunE:                  addProfileFunction,
+	}
+	addProfileInitFlags(addProfileCommand.Flags())
+	root.AddCommand(addProfileCommand)
+
 	versionCommand := &cobra.Command{
 		Use:                   "version",
 		DisableFlagsInUseLine: true,
