@@ -16,11 +16,11 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-func addProfileInitFlags(flag *pflag.FlagSet) {
+// AddProfileInitFlags sets up the CLI flags for the 'add-profile' subcommand
+func AddProfileInitFlags(flag *pflag.FlagSet) {
 
 	flag.String(VaultAWSKeychainNameFlag, VaultAWSKeychainNameDefault, "The aws-vault keychain name")
-	flag.String(VaultAWSProfileFlag, "", "The aws-vault profile name")
-	flag.String(VaultAWSNewProfileFlag, "", "A comma separated list of new AWS 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
+	flag.StringSlice(AWSProfileAccountFlag, []string{}, "A comma separated list of AWS profiles and account IDs 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
 	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
@@ -32,7 +32,8 @@ func addProfileInitFlags(flag *pflag.FlagSet) {
 	flag.SortFlags = false
 }
 
-func addProfileCheckConfig(v *viper.Viper) error {
+// AddProfileCheckConfig checks the CLI flag configuration for the 'add-profile' subcommand
+func AddProfileCheckConfig(v *viper.Viper) error {
 
 	if err := checkVault(v); err != nil {
 		return fmt.Errorf("aws-vault check failed: %w", err)
@@ -84,7 +85,7 @@ func (sc *SetupConfig) AddProfile() error {
 	}
 	mfaSerial := mfaSerialKey.String()
 
-	for _, element := range *sc.NewProfiles {
+	for _, element := range sc.NewProfiles {
 		profileName := strings.Split(element, ":")[0]
 		awsAccountID := strings.Split(element, ":")[1]
 
@@ -145,7 +146,7 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check the config and exit with usage details if there is a problem
-	checkConfigErr := addProfileCheckConfig(v)
+	checkConfigErr := AddProfileCheckConfig(v)
 	if checkConfigErr != nil {
 		return checkConfigErr
 	}
@@ -153,8 +154,7 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	// Get command line flag values
 	awsRegion := v.GetString(AWSRegionFlag)
 	awsVaultKeychainName := v.GetString(VaultAWSKeychainNameFlag)
-	awsVaultProfile := v.GetString(VaultAWSProfileFlag)
-	awsVaultNewProfile := v.GetStringSlice(VaultAWSNewProfileFlag)
+	awsVaultProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
 	iamUser := v.GetString(IAMUserFlag)
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
@@ -184,8 +184,8 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 		Role:            iamRole,
 		Region:          awsRegion,
 		Partition:       partition,
-		RoleProfileName: &awsVaultProfile,
-		NewProfiles:     &awsVaultNewProfile,
+		RoleProfileName: &awsVaultProfileAccount[0],
+		NewProfiles:     awsVaultProfileAccount[1:],
 		Output:          output,
 		Config:          config,
 		Keyring:         keyring,

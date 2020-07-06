@@ -38,12 +38,12 @@ type MFATokenPair struct {
 	Token2 string `validate:"numeric,len=6,nefield=Token1"`
 }
 
-func setupUserInitFlags(flag *pflag.FlagSet) {
+// SetupUserInitFlags sets up the CLI flags for the 'setup' subcommand
+func SetupUserInitFlags(flag *pflag.FlagSet) {
 
 	flag.String(VaultAWSKeychainNameFlag, VaultAWSKeychainNameDefault, "The aws-vault keychain name")
-	flag.String(VaultAWSProfileFlag, "", "The aws-vault profile name")
+	flag.StringSlice(AWSProfileAccountFlag, []string{}, "A comma separated list of AWS profiles and account IDs 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
-	flag.String(AWSAccountIDFlag, "", "The AWS account ID")
 	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
 	flag.String(OutputFlag, "json", "The AWS CLI output format")
@@ -57,7 +57,8 @@ func setupUserInitFlags(flag *pflag.FlagSet) {
 	flag.SortFlags = false
 }
 
-func setupUserCheckConfig(v *viper.Viper) error {
+// SetupUserCheckConfig checks the CLI flag configuration for the 'setup' subcommand
+func SetupUserCheckConfig(v *viper.Viper) error {
 
 	if err := checkVault(v); err != nil {
 		return fmt.Errorf("aws-vault check failed: %w", err)
@@ -67,8 +68,8 @@ func setupUserCheckConfig(v *viper.Viper) error {
 		return fmt.Errorf("Region check failed: %w", err)
 	}
 
-	if err := checkAccountID(v); err != nil {
-		return fmt.Errorf("Account ID check failed: %w", err)
+	if err := checkProfileAccount(v); err != nil {
+		return fmt.Errorf("AWS Profile and Account ID check failed: %w", err)
 	}
 
 	if err := checkIAMUser(v); err != nil {
@@ -97,7 +98,7 @@ type SetupConfig struct {
 	BaseProfile     *vault.ProfileSection
 	RoleProfileName *string
 	RoleProfile     *vault.ProfileSection
-	NewProfiles     *[]string
+	NewProfiles     []string
 	Output          string
 	Config          *vault.ConfigFile
 	AccessKeyID     string
@@ -612,7 +613,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check the config and exit with usage details if there is a problem
-	checkConfigErr := setupUserCheckConfig(v)
+	checkConfigErr := SetupUserCheckConfig(v)
 	if checkConfigErr != nil {
 		return checkConfigErr
 	}

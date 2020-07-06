@@ -19,6 +19,11 @@ bin/setup-new-aws-user: ## Build setup-new-aws-user
 test:
 	go test -v ./cmd/...
 
+.PHONY: test_coverage
+test_coverage:
+	go test -v -coverprofile=coverage.out -covermode=count ./cmd/...
+	go tool cover -html=coverage.out
+
 .PHONY: clean
 clean:
 	rm -f .*.stamp

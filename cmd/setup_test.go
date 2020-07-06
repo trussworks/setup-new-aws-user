@@ -57,6 +57,7 @@ output=json
 		QrTempFile:  nil,
 		Keyring:     keyring,
 	}
+	logger.SetFlags(0)
 	err = setupConfig.UpdateAWSConfigFile()
 	assert.NoError(t, err)
 }

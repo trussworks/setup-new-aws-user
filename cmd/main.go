@@ -30,7 +30,7 @@ func main() {
 		Long:                  "Setup new AWS user with aws-vault",
 		RunE:                  setupUserFunction,
 	}
-	setupUserInitFlags(setupUserCommand.Flags())
+	SetupUserInitFlags(setupUserCommand.Flags())
 	root.AddCommand(setupUserCommand)
 
 	addProfileCommand := &cobra.Command{
@@ -40,7 +40,7 @@ func main() {
 		Long:                  "Add new AWS config profile",
 		RunE:                  addProfileFunction,
 	}
-	addProfileInitFlags(addProfileCommand.Flags())
+	AddProfileInitFlags(addProfileCommand.Flags())
 	root.AddCommand(addProfileCommand)
 
 	versionCommand := &cobra.Command{
