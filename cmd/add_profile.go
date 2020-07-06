@@ -19,11 +19,9 @@ import (
 // AddProfileInitFlags sets up the CLI flags for the 'add-profile' subcommand
 func AddProfileInitFlags(flag *pflag.FlagSet) {
 
-	flag.String(VaultAWSKeychainNameFlag, VaultAWSKeychainNameDefault, "The aws-vault keychain name")
 	flag.StringSlice(AWSProfileAccountFlag, []string{}, "A comma separated list of AWS profiles and account IDs 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
-	flag.String(AWSBaseProfileFlag, "", fmt.Sprintf("The AWS base profile. If none provided will use first profile name from %q flag", AWSProfileAccountFlag))
+	flag.String(AWSProfileFlag, "", "The AWS profile used to get the source_profile and mfa_serial attributes")
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
-	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
 	flag.String(OutputFlag, "json", "The AWS CLI output format")
 
@@ -48,10 +46,6 @@ func AddProfileCheckConfig(v *viper.Viper) error {
 		return fmt.Errorf("AWS Profile and Account ID check failed: %w", err)
 	}
 
-	if err := checkIAMUser(v); err != nil {
-		return fmt.Errorf("IAM User check failed: %w", err)
-	}
-
 	if err := checkIAMRole(v); err != nil {
 		return fmt.Errorf("IAM Role check failed: %w", err)
 	}
@@ -63,19 +57,110 @@ func AddProfileCheckConfig(v *viper.Viper) error {
 	return nil
 }
 
-// AddProfile adds a new profile to the AWS config file
-func (sc *SetupConfig) AddProfile() error {
+// AddProfileConfig holds information for the AWS user being configured by this script
+type AddProfileConfig struct {
+	Logger *log.Logger
+	Config *vault.ConfigFile
 
-	sc.Logger.Printf("Adding new profiles to the AWS config file: %s", sc.Config.Path)
+	IAMRole   string
+	Partition string
+	Region    string
+	Output    string
+
+	BaseProfileName    string
+	AWSProfileName     string
+	AWSProfileAccounts []string
+	AWSProfiles        []vault.ProfileSection
+	MFASerial          string
+}
+
+// UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
+func (apc *AddProfileConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string) error {
+	apc.Logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
+	sectionName := fmt.Sprintf("profile %s", profile.Name)
+
+	// Get or create section before updating
+	var err error
+	var section *ini.Section
+	section = iniFile.Section(sectionName)
+	if section == nil {
+		section, err = iniFile.NewSection(sectionName)
+		if err != nil {
+			return fmt.Errorf("error creating section %q: %w", profile.Name, err)
+		}
+	}
+
+	// Add the source profile when provided
+	if sourceProfile != nil {
+		_, err = section.NewKey("source_profile", *sourceProfile)
+		if err != nil {
+			return fmt.Errorf("unable to add source profile: %w", err)
+		}
+	}
+
+	if err = section.ReflectFrom(&profile); err != nil {
+		return fmt.Errorf("error mapping profile to ini file: %w", err)
+	}
+	_, err = section.NewKey("output", apc.Output)
+	if err != nil {
+		return fmt.Errorf("unable to add output key: %w", err)
+	}
+	return nil
+}
+
+// AddProfile adds a new profile to the AWS config file
+func (apc *AddProfileConfig) AddProfile() error {
+
+	apc.Logger.Printf("Adding new profiles to the AWS config file: %s", apc.Config.Path)
 
 	// load the ini file
-	iniFile, err := ini.Load(sc.Config.Path)
+	iniFile, err := ini.Load(apc.Config.Path)
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
 
+	roleProfileSection := iniFile.Section(fmt.Sprintf("profile %s", apc.AWSProfileName))
+	// Get the source profile
+	sourceProfileKey, err := roleProfileSection.GetKey("source_profile")
+	if err != nil {
+		return fmt.Errorf("Unable to get source profile from %q: %w", apc.AWSProfileName, err)
+	}
+	apc.BaseProfileName = sourceProfileKey.String()
+
+	// Get the MFA Serial
+	mfaSerialKey, err := roleProfileSection.GetKey("mfa_serial")
+	if err != nil {
+		return err
+	}
+	apc.MFASerial = mfaSerialKey.String()
+
+	// Add each of the remaining profiles
+	for _, profileAccount := range apc.AWSProfileAccounts {
+		profileAccountParts := strings.Split(profileAccount, ":")
+		profileName := profileAccountParts[0]
+		accountID := profileAccountParts[1]
+
+		roleProfile := vault.ProfileSection{
+			Name:      profileName,
+			Region:    apc.Region,
+			MfaSerial: apc.MFASerial,
+
+			// Each account assumes a role that is added to the config profile
+			RoleARN: fmt.Sprintf("arn:%s:iam::%s:role/%s",
+				apc.Partition,
+				accountID,
+				apc.IAMRole),
+		}
+		apc.AWSProfiles = append(apc.AWSProfiles, roleProfile)
+
+		// Add the role profile with base as the source profile
+		if err := apc.UpdateAWSProfile(iniFile, &roleProfile, &apc.BaseProfileName); err != nil {
+			return err
+		}
+	}
+
 	// save it back to the aws config path
-	return iniFile.SaveTo(sc.Config.Path)
+	return iniFile.SaveTo(apc.Config.Path)
 }
 
 func addProfileFunction(cmd *cobra.Command, args []string) error {
@@ -122,9 +207,8 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 
 	// Get command line flag values
 	awsRegion := v.GetString(AWSRegionFlag)
-	awsVaultKeychainName := v.GetString(VaultAWSKeychainNameFlag)
-	// awsProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
-	iamUser := v.GetString(IAMUserFlag)
+	awsProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
+	awsProfile := v.GetString(AWSProfileFlag)
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
 
@@ -142,29 +226,23 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 
-	keyring, err := getKeyring(awsVaultKeychainName)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	setupConfig := SetupConfig{
+	addProfileConfig := AddProfileConfig{
 		// Config
-		Logger:  logger,
-		Config:  config,
-		Keyring: keyring,
+		Logger: logger,
+		Config: config,
 
 		// Profile Inputs
-		IAMUser:   iamUser,
 		IAMRole:   iamRole,
 		Region:    awsRegion,
 		Partition: partition,
 		Output:    output,
 
-		// RoleProfileName: &awsVaultProfileAccount[0],
-		// NewProfiles:     awsVaultProfileAccount[1:],
+		// Profiles
+		AWSProfileAccounts: awsProfileAccount,
+		AWSProfileName:     awsProfile,
 	}
 
-	if err := setupConfig.AddProfile(); err != nil {
+	if err := addProfileConfig.AddProfile(); err != nil {
 		logger.Fatal(err)
 	}
 

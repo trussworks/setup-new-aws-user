@@ -69,7 +69,6 @@ func TestCommandSuite(t *testing.T) {
 func (suite *commandTestSuite) TestAddProfileFlags() {
 	suite.Setup(AddProfileInitFlags, []string{
 		"--aws-profile-account", "test-new:012345678901",
-		"--iam-user", "me",
 		"--iam-role", "engineer",
 	})
 	suite.NoError(AddProfileCheckConfig(suite.viper))
