@@ -61,7 +61,7 @@ func (suite *cliTestSuite) TestCheckVault() {
 	}
 	for _, testValue := range testValues {
 		suite.viper.Set(VaultAWSKeychainNameFlag, testValue)
-		suite.viper.Set(VaultAWSProfileFlag, "profile")
+		suite.viper.Set(AWSProfileFlag, "profile")
 		suite.NoError(checkVault(suite.viper))
 	}
 	testValuesWithErrors := []string{
@@ -69,7 +69,7 @@ func (suite *cliTestSuite) TestCheckVault() {
 	}
 	for _, testValue := range testValuesWithErrors {
 		suite.viper.Set(VaultAWSKeychainNameFlag, testValue)
-		suite.viper.Set(VaultAWSProfileFlag, "profile")
+		suite.viper.Set(AWSProfileFlag, "profile")
 		suite.Error(checkVault(suite.viper))
 	}
 }

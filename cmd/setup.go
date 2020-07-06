@@ -43,6 +43,7 @@ func SetupUserInitFlags(flag *pflag.FlagSet) {
 
 	flag.String(VaultAWSKeychainNameFlag, VaultAWSKeychainNameDefault, "The aws-vault keychain name")
 	flag.StringSlice(AWSProfileAccountFlag, []string{}, "A comma separated list of AWS profiles and account IDs 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
+	flag.String(AWSBaseProfileFlag, "", fmt.Sprintf("The AWS base profile. If none provided will use first profile name from %q flag", AWSProfileAccountFlag))
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
 	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
@@ -89,23 +90,26 @@ func SetupUserCheckConfig(v *viper.Viper) error {
 
 // SetupConfig holds information for the AWS user being configured by this script
 type SetupConfig struct {
-	Logger          *log.Logger
-	Name            string
-	Role            string
-	Region          string
-	Partition       string
-	BaseProfileName *string
-	BaseProfile     *vault.ProfileSection
-	RoleProfileName *string
-	RoleProfile     *vault.ProfileSection
-	NewProfiles     []string
-	Output          string
-	Config          *vault.ConfigFile
+	Logger     *log.Logger
+	Config     *vault.ConfigFile
+	QrTempFile *os.File
+	Keyring    *keyring.Keyring
+	NoMFA      bool
+
+	IAMUser   string
+	IAMRole   string
+	Partition string
+	Region    string
+	Output    string
+
+	BaseProfileName    string
+	BaseProfile        *vault.ProfileSection
+	AWSProfileAccounts []string
+	AWSProfiles        []vault.ProfileSection
+	MFASerial          string
+
 	AccessKeyID     string
 	SecretAccessKey string
-	QrTempFile      *os.File
-	Keyring         *keyring.Keyring
-	NoMFA           bool
 }
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
@@ -181,7 +185,7 @@ func (sc *SetupConfig) newSession() (*session.Session, error) {
 				AccessKeyID:     sc.AccessKeyID,
 				SecretAccessKey: sc.SecretAccessKey,
 			}),
-			Region: aws.String(sc.BaseProfile.Region),
+			Region: aws.String(sc.Region),
 		},
 	})
 	if err != nil {
@@ -198,7 +202,7 @@ func (sc *SetupConfig) newMFASession() (*session.Session, error) {
 	}
 	stsClient := sts.New(basicSession)
 	getSessionTokenOutput, err := stsClient.GetSessionToken(&sts.GetSessionTokenInput{
-		SerialNumber: aws.String(sc.BaseProfile.MfaSerial),
+		SerialNumber: aws.String(sc.MFASerial),
 		TokenCode:    aws.String(mfaToken),
 	})
 	if err != nil {
@@ -232,7 +236,7 @@ func (sc *SetupConfig) GetMFADevice() error {
 	svc := iam.New(sess)
 
 	mfaDeviceInput := &iam.ListMFADevicesInput{
-		UserName: aws.String(sc.Name),
+		UserName: aws.String(sc.IAMUser),
 	}
 
 	mfaDeviceOutput, err := svc.ListMFADevices(mfaDeviceInput)
@@ -248,8 +252,7 @@ func (sc *SetupConfig) GetMFADevice() error {
 	}
 	mfaDevice := mfaDeviceOutput.MFADevices[0]
 
-	sc.BaseProfile.MfaSerial = *mfaDevice.SerialNumber
-	sc.RoleProfile.MfaSerial = *mfaDevice.SerialNumber
+	sc.MFASerial = *mfaDevice.SerialNumber
 
 	return nil
 }
@@ -266,7 +269,7 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 	svc := iam.New(sess)
 
 	mfaDeviceInput := &iam.CreateVirtualMFADeviceInput{
-		VirtualMFADeviceName: aws.String(sc.Name),
+		VirtualMFADeviceName: aws.String(sc.IAMUser),
 	}
 
 	mfaDeviceOutput, err := svc.CreateVirtualMFADevice(mfaDeviceInput)
@@ -274,8 +277,7 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 		return fmt.Errorf("unable to create virtual MFA: %w", err)
 	}
 
-	sc.BaseProfile.MfaSerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
-	sc.RoleProfile.MfaSerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	sc.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
 
 	// For the QR code, create a string that encodes:
 	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
@@ -356,7 +358,7 @@ func (sc *SetupConfig) EnableVirtualMFADevice() error {
 		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
 		AuthenticationCode2: aws.String(mfaTokenPair.Token2),
 		SerialNumber:        aws.String(sc.BaseProfile.MfaSerial),
-		UserName:            aws.String(sc.Name),
+		UserName:            aws.String(sc.IAMUser),
 	}
 
 	_, err = svc.EnableMFADevice(enableMFADeviceInput)
@@ -378,21 +380,21 @@ func (sc *SetupConfig) RotateAccessKeys() error {
 	}
 	iamClient := iam.New(sess)
 	listAccessKeysOutput, err := iamClient.ListAccessKeys(&iam.ListAccessKeysInput{
-		UserName: aws.String(sc.Name),
+		UserName: aws.String(sc.IAMUser),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to list access keys: %w", err)
 	}
 
 	if len(listAccessKeysOutput.AccessKeyMetadata) == maxNumAccessKeys {
-		return fmt.Errorf("maximum of %v access keys have already been created for %s; delete your unused access key through the AWS console before trying again", maxNumAccessKeys, sc.Name)
+		return fmt.Errorf("maximum of %v access keys have already been created for %s; delete your unused access key through the AWS console before trying again", maxNumAccessKeys, sc.IAMUser)
 	}
 
 	oldAccessKeyID := listAccessKeysOutput.AccessKeyMetadata[0].AccessKeyId
 
 	sc.Logger.Println("Creating new access key")
 	newAccessKey, err := iamClient.CreateAccessKey(&iam.CreateAccessKeyInput{
-		UserName: aws.String(sc.Name),
+		UserName: aws.String(sc.IAMUser),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create new access key: %w", err)
@@ -409,7 +411,7 @@ func (sc *SetupConfig) RotateAccessKeys() error {
 	sc.Logger.Println("Deleting old access key")
 	_, err = iamClient.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 		AccessKeyId: oldAccessKeyID,
-		UserName:    aws.String(sc.Name),
+		UserName:    aws.String(sc.IAMUser),
 	})
 
 	if err != nil {
@@ -425,14 +427,14 @@ func (sc *SetupConfig) AddVaultProfile() error {
 	creds := credentials.Value{AccessKeyID: sc.AccessKeyID, SecretAccessKey: sc.SecretAccessKey}
 
 	ckr := &vault.CredentialKeyring{Keyring: *sc.Keyring}
-	errSet := ckr.Set(sc.BaseProfile.Name, creds)
+	errSet := ckr.Set(sc.BaseProfileName, creds)
 	if errSet != nil {
 		return fmt.Errorf("unable to set base profile credentials: %w", errSet)
 	}
 
-	sc.Logger.Printf("Added credentials to profile %q in vault", sc.BaseProfile.Name)
+	sc.Logger.Printf("Added credentials to profile %q in vault", sc.BaseProfileName)
 
-	err := deleteSession(sc.BaseProfile.Name, sc.Keyring, sc.Logger)
+	err := deleteSession(sc.BaseProfileName, sc.Keyring, sc.Logger)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -477,19 +479,47 @@ func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.Profil
 // UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
 func (sc *SetupConfig) UpdateAWSConfigFile() error {
 	sc.Logger.Printf("Updating the AWS config file: %s", sc.Config.Path)
+
 	// load the ini file
 	iniFile, err := ini.Load(sc.Config.Path)
-
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
+
+	sc.BaseProfile = &vault.ProfileSection{
+		Name:      sc.BaseProfileName,
+		Region:    sc.Region,
+		MfaSerial: sc.MFASerial,
+	}
+
 	// Add the base profile
-	if err = sc.UpdateAWSProfile(iniFile, sc.BaseProfile, nil); err != nil {
+	if err := sc.UpdateAWSProfile(iniFile, sc.BaseProfile, nil); err != nil {
 		return fmt.Errorf("could not add base profile: %w", err)
 	}
-	// Add the role profile with base as the source profile
-	if err = sc.UpdateAWSProfile(iniFile, sc.RoleProfile, &sc.BaseProfile.Name); err != nil {
-		return fmt.Errorf("could not add role profile: %w", err)
+
+	// Add each of the remaining profiles
+	for _, profileAccount := range sc.AWSProfileAccounts {
+		profileAccountParts := strings.Split(profileAccount, ":")
+		profileName := profileAccountParts[0]
+		accountID := profileAccountParts[1]
+
+		roleProfile := vault.ProfileSection{
+			Name:      profileName,
+			Region:    sc.Region,
+			MfaSerial: sc.MFASerial,
+
+			// Each account assumes a role that is added to the config profile
+			RoleARN: fmt.Sprintf("arn:%s:iam::%s:role/%s",
+				sc.Partition,
+				accountID,
+				sc.IAMRole),
+		}
+		sc.AWSProfiles = append(sc.AWSProfiles, roleProfile)
+
+		// Add the role profile with base as the source profile
+		if err := sc.UpdateAWSProfile(iniFile, &roleProfile, &sc.BaseProfile.Name); err != nil {
+			return fmt.Errorf("could not add role profile: %w", err)
+		}
 	}
 
 	// save it back to the aws config path
@@ -620,13 +650,18 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 
 	// Get command line flag values
 	awsRegion := v.GetString(AWSRegionFlag)
-	awsAccountID := v.GetString(AWSAccountIDFlag)
 	awsVaultKeychainName := v.GetString(VaultAWSKeychainNameFlag)
-	awsVaultProfile := v.GetString(VaultAWSProfileFlag)
+	awsProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
+	awsBaseProfile := v.GetString(AWSBaseProfileFlag)
 	iamUser := v.GetString(IAMUserFlag)
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
 	noMFA := v.GetBool(NoMFAFlag)
+
+	// Get base profile
+	if len(awsBaseProfile) == 0 {
+		awsBaseProfile = strings.Split(awsProfileAccount[0], ":")[0]
+	}
 
 	// Validator used to validate input options for MFA
 	validate = validator.New()
@@ -637,20 +672,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 
-	baseProfileName := fmt.Sprintf("%s-base", awsVaultProfile)
-	baseProfile := vault.ProfileSection{
-		Name:   baseProfileName,
-		Region: awsRegion,
-	}
-
-	roleProfile := vault.ProfileSection{
-		Name: awsVaultProfile,
-		RoleARN: fmt.Sprintf("arn:%s:iam::%s:role/%s",
-			partition,
-			awsAccountID,
-			iamRole),
-		Region: awsRegion,
-	}
+	baseProfileName := fmt.Sprintf("%s-base", awsBaseProfile)
 
 	// Create a Temp File
 	tempfile, err := ioutil.TempFile("", "temp-qr.*.png")
@@ -674,22 +696,27 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
 	setupConfig := SetupConfig{
-		Logger:          logger,
-		Name:            iamUser,
-		Role:            iamRole,
-		Region:          awsRegion,
-		Partition:       partition,
-		BaseProfileName: &baseProfileName,
-		BaseProfile:     &baseProfile,
-		RoleProfileName: &awsVaultProfile,
-		RoleProfile:     &roleProfile,
-		Output:          output,
-		Config:          config,
-		QrTempFile:      tempfile,
-		Keyring:         keyring,
-		NoMFA:           noMFA,
+		// Config
+		Logger:     logger,
+		Config:     config,
+		QrTempFile: tempfile,
+		Keyring:    keyring,
+		NoMFA:      noMFA,
+
+		// Profile Inputs
+		IAMUser:   iamUser,
+		IAMRole:   iamRole,
+		Region:    awsRegion,
+		Partition: partition,
+		Output:    output,
+
+		// Profiles
+		BaseProfileName:    baseProfileName,
+		AWSProfileAccounts: awsProfileAccount,
 	}
+
 	setupConfig.Setup()
 
 	// If we got this far, we win

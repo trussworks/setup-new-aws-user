@@ -21,6 +21,7 @@ func AddProfileInitFlags(flag *pflag.FlagSet) {
 
 	flag.String(VaultAWSKeychainNameFlag, VaultAWSKeychainNameDefault, "The aws-vault keychain name")
 	flag.StringSlice(AWSProfileAccountFlag, []string{}, "A comma separated list of AWS profiles and account IDs 'PROFILE1:ACCOUNTID1,PROFILE2:ACCOUNTID2,...'")
+	flag.String(AWSBaseProfileFlag, "", fmt.Sprintf("The AWS base profile. If none provided will use first profile name from %q flag", AWSProfileAccountFlag))
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
 	flag.String(IAMUserFlag, "", "The IAM user name to setup")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
@@ -41,6 +42,10 @@ func AddProfileCheckConfig(v *viper.Viper) error {
 
 	if err := checkRegion(v); err != nil {
 		return fmt.Errorf("Region check failed: %w", err)
+	}
+
+	if err := checkProfileAccount(v); err != nil {
+		return fmt.Errorf("AWS Profile and Account ID check failed: %w", err)
 	}
 
 	if err := checkIAMUser(v); err != nil {
@@ -67,42 +72,6 @@ func (sc *SetupConfig) AddProfile() error {
 	iniFile, err := ini.Load(sc.Config.Path)
 	if err != nil {
 		return fmt.Errorf("unable to load aws config file: %w", err)
-	}
-
-	roleProfileSection := iniFile.Section(fmt.Sprintf("profile %s", *sc.RoleProfileName))
-
-	// Get the source profile
-	sourceProfileKey, err := roleProfileSection.GetKey("source_profile")
-	if err != nil {
-		return fmt.Errorf("Unable to get source profile from %q: %w", *sc.RoleProfileName, err)
-	}
-	sourceProfileName := sourceProfileKey.String()
-
-	// Get the MFA Serial
-	mfaSerialKey, err := roleProfileSection.GetKey("mfa_serial")
-	if err != nil {
-		return err
-	}
-	mfaSerial := mfaSerialKey.String()
-
-	for _, element := range sc.NewProfiles {
-		profileName := strings.Split(element, ":")[0]
-		awsAccountID := strings.Split(element, ":")[1]
-
-		profile := vault.ProfileSection{
-			Name: profileName,
-			RoleARN: fmt.Sprintf("arn:%s:iam::%s:role/%s",
-				sc.Partition,
-				awsAccountID,
-				sc.Role),
-			MfaSerial: mfaSerial,
-			Region:    sc.Region,
-		}
-
-		// Add the role profile with base as the source profile
-		if err := sc.UpdateAWSProfile(iniFile, &profile, &sourceProfileName); err != nil {
-			return err
-		}
 	}
 
 	// save it back to the aws config path
@@ -154,7 +123,7 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	// Get command line flag values
 	awsRegion := v.GetString(AWSRegionFlag)
 	awsVaultKeychainName := v.GetString(VaultAWSKeychainNameFlag)
-	awsVaultProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
+	// awsProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
 	iamUser := v.GetString(IAMUserFlag)
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
@@ -179,16 +148,20 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	}
 
 	setupConfig := SetupConfig{
-		Logger:          logger,
-		Name:            iamUser,
-		Role:            iamRole,
-		Region:          awsRegion,
-		Partition:       partition,
-		RoleProfileName: &awsVaultProfileAccount[0],
-		NewProfiles:     awsVaultProfileAccount[1:],
-		Output:          output,
-		Config:          config,
-		Keyring:         keyring,
+		// Config
+		Logger:  logger,
+		Config:  config,
+		Keyring: keyring,
+
+		// Profile Inputs
+		IAMUser:   iamUser,
+		IAMRole:   iamRole,
+		Region:    awsRegion,
+		Partition: partition,
+		Output:    output,
+
+		// RoleProfileName: &awsVaultProfileAccount[0],
+		// NewProfiles:     awsVaultProfileAccount[1:],
 	}
 
 	if err := setupConfig.AddProfile(); err != nil {

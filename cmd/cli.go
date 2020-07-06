@@ -12,20 +12,18 @@ import (
 const (
 	// AWSRegionFlag is the generic AWS Region Flag
 	AWSRegionFlag string = "aws-region"
-	// AWSAccountIDFlag is the AWS AccountID Flag
-	AWSAccountIDFlag string = "aws-account-id"
 
 	// VaultAWSKeychainNameFlag is the aws-vault keychain name Flag
 	VaultAWSKeychainNameFlag string = "aws-vault-keychain-name"
 	// VaultAWSKeychainNameDefault is the aws-vault default keychain name
 	VaultAWSKeychainNameDefault string = "login"
-	// VaultAWSProfileFlag is the aws-vault profile name Flag
-	VaultAWSProfileFlag string = "aws-profile"
 
 	// AWSProfileAccountFlag is the combined AWS profile name and account ID Flag
 	AWSProfileAccountFlag string = "aws-profile-account"
-	//// AWSBaseProfileFlag is the AWS base profile name Flag
-	//AWSBaseProfileFlag string = "aws-base-profile"
+	// AWSBaseProfileFlag is the AWS base profile name Flag
+	AWSBaseProfileFlag string = "aws-base-profile"
+	// AWSProfileFlag is the AWS Profile flag
+	AWSProfileFlag string = "aws-profile"
 
 	// IAMUserFlag is the IAM User name Flag
 	IAMUserFlag string = "iam-user"
@@ -59,14 +57,6 @@ func (e *errInvalidKeychainName) Error() string {
 	return fmt.Sprintf("invalid keychain name '%s'", e.KeychainName)
 }
 
-// type errInvalidAWSProfile struct {
-// 	Profile string
-// }
-//
-// func (e *errInvalidAWSProfile) Error() string {
-// 	return fmt.Sprintf("invalid aws profile '%s'", e.Profile)
-// }
-
 func checkVault(v *viper.Viper) error {
 	// Both keychain name and profile are required or both must be missing
 	keychainName := v.GetString(VaultAWSKeychainNameFlag)
@@ -76,11 +66,6 @@ func checkVault(v *viper.Viper) error {
 	if len(keychainName) > 0 && !stringSliceContains(keychainNames, keychainName) {
 		return fmt.Errorf("%s is invalid, expected %v: %w", VaultAWSKeychainNameFlag, keychainNames, &errInvalidKeychainName{KeychainName: keychainName})
 	}
-
-	// awsProfile := v.GetString(VaultAWSProfileFlag)
-	// if len(awsProfile) == 0 {
-	// 	return fmt.Errorf("%s must not be empty: %w", VaultAWSProfileFlag, &errInvalidAWSProfile{Profile: awsProfile})
-	// }
 
 	return nil
 }
@@ -114,7 +99,7 @@ func (e *errInvalidAccountID) Error() string {
 
 func checkAccountID(id string) error {
 	if matched, err := regexp.Match(`^\d{12}$`, []byte(id)); !matched || err != nil {
-		return fmt.Errorf("%s must be a 12 digit number: %w", AWSAccountIDFlag, &errInvalidAccountID{AccountID: id})
+		return fmt.Errorf("AWS Account ID must be a 12 digit number: %w", &errInvalidAccountID{AccountID: id})
 	}
 
 	return nil
