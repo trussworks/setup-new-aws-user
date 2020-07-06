@@ -43,6 +43,7 @@ func TestExistingAWSProfile(t *testing.T) {
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
 	user := User{
+		Logger:      logger,
 		Name:        "test",
 		BaseProfile: &baseProfile,
 		Output:      "json",
@@ -76,6 +77,7 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
 	user := User{
+		Logger:      logger,
 		Name:        "test-user",
 		BaseProfile: &baseProfile,
 		RoleProfile: &roleProfile,
@@ -84,7 +86,7 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 		QrTempFile:  nil,
 		Keyring:     keyring,
 	}
-	err = user.UpdateAWSConfigFile(logger)
+	err = user.UpdateAWSConfigFile()
 	assert.NoError(t, err)
 }
 
