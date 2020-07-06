@@ -9,7 +9,7 @@ builds:
     - linux
   goarch:
     - amd64
-  main: ./cmd/main.go
+  main: ./cmd/
 brews:
   - description: "A tool that creates a virtual MFA device and rotates access keys for a new AWS user."
     github:
