@@ -88,6 +88,7 @@ func setupUserCheckConfig(v *viper.Viper) error {
 
 // User holds information for the AWS user being configured by this script
 type User struct {
+	Logger          *log.Logger
 	Name            string
 	BaseProfile     *vault.Profile
 	RoleProfile     *vault.Profile
@@ -102,47 +103,47 @@ type User struct {
 
 // Setup orchestrates the tasks to create the user's MFA and rotate access
 // keys.
-func (u *User) Setup(logger *log.Logger) {
+func (u *User) Setup() {
 	err := u.PromptAccessCredentials()
 	if err != nil {
-		logger.Fatal(err)
+		u.Logger.Fatal(err)
 	}
 
-	err = u.AddVaultProfile(logger)
+	err = u.AddVaultProfile()
 	if err != nil {
-		logger.Fatal(err)
+		u.Logger.Fatal(err)
 	}
 
 	if u.NoMFA {
-		err = u.GetMFADevice(logger)
+		err = u.GetMFADevice()
 		if err != nil {
-			logger.Fatal(err)
+			u.Logger.Fatal(err)
 		}
 	} else {
-		err = u.CreateVirtualMFADevice(logger)
+		err = u.CreateVirtualMFADevice()
 		if err != nil {
-			logger.Fatal(err)
+			u.Logger.Fatal(err)
 		}
 
-		err = u.EnableVirtualMFADevice(logger)
+		err = u.EnableVirtualMFADevice()
 		if err != nil {
-			logger.Fatal(err)
+			u.Logger.Fatal(err)
 		}
 	}
 
-	err = u.UpdateAWSConfigFile(logger)
+	err = u.UpdateAWSConfigFile()
 	if err != nil {
-		logger.Fatal(err)
+		u.Logger.Fatal(err)
 	}
 
-	err = u.RemoveVaultSession(logger)
+	err = u.RemoveVaultSession()
 	if err != nil {
-		logger.Fatal(err)
+		u.Logger.Fatal(err)
 	}
 
-	err = u.RotateAccessKeys(logger)
+	err = u.RotateAccessKeys()
 	if err != nil {
-		logger.Fatal(err)
+		u.Logger.Fatal(err)
 	}
 
 }
@@ -182,8 +183,8 @@ func (u *User) newSession() (*session.Session, error) {
 	return sess, nil
 }
 
-func (u *User) newMFASession(logger *log.Logger) (*session.Session, error) {
-	mfaToken := promptMFAtoken("Third ", logger)
+func (u *User) newMFASession() (*session.Session, error) {
+	mfaToken := promptMFAtoken("Third ", u.Logger)
 	basicSession, err := u.newSession()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create new session: %w", err)
@@ -194,7 +195,7 @@ func (u *User) newMFASession(logger *log.Logger) (*session.Session, error) {
 		TokenCode:    aws.String(mfaToken),
 	})
 	if err != nil {
-		logger.Fatalf("unable to get session token: %v", err)
+		u.Logger.Fatalf("unable to get session token: %v", err)
 	}
 	mfaSession, err := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -214,8 +215,8 @@ func (u *User) newMFASession(logger *log.Logger) (*session.Session, error) {
 
 // GetMFADevice gets the user's existing virtual MFA device and updates the
 // MFA serial in the profile field.
-func (u *User) GetMFADevice(logger *log.Logger) error {
-	logger.Println("Getting the existing MFA device...")
+func (u *User) GetMFADevice() error {
+	u.Logger.Println("Getting the existing MFA device...")
 
 	sess, err := u.newSession()
 	if err != nil {
@@ -248,8 +249,8 @@ func (u *User) GetMFADevice(logger *log.Logger) error {
 
 // CreateVirtualMFADevice creates the user's virtual MFA device and updates the
 // MFA serial in the profile field.
-func (u *User) CreateVirtualMFADevice(logger *log.Logger) error {
-	logger.Println("Creating the virtual MFA device...")
+func (u *User) CreateVirtualMFADevice() error {
+	u.Logger.Println("Creating the virtual MFA device...")
 
 	sess, err := u.newSession()
 	if err != nil {
@@ -330,13 +331,13 @@ func getMFATokenPair(logger *log.Logger) MFATokenPair {
 }
 
 // EnableVirtualMFADevice enables the user's MFA device
-func (u *User) EnableVirtualMFADevice(logger *log.Logger) error {
-	logger.Println("Enabling the virtual MFA device")
+func (u *User) EnableVirtualMFADevice() error {
+	u.Logger.Println("Enabling the virtual MFA device")
 	if u.BaseProfile.MFASerial == "" {
 		return fmt.Errorf("profile MFA serial must be set")
 	}
 
-	mfaTokenPair := getMFATokenPair(logger)
+	mfaTokenPair := getMFATokenPair(u.Logger)
 
 	sess, err := u.newSession()
 	if err != nil {
@@ -360,11 +361,11 @@ func (u *User) EnableVirtualMFADevice(logger *log.Logger) error {
 }
 
 // RotateAccessKeys rotates the user's AWS access key.
-func (u *User) RotateAccessKeys(logger *log.Logger) error {
-	logger.Println("Rotating AWS access keys")
+func (u *User) RotateAccessKeys() error {
+	u.Logger.Println("Rotating AWS access keys")
 
-	logger.Println("A new unique MFA token is needed to rotate the AWS access keys")
-	sess, err := u.newMFASession(logger)
+	u.Logger.Println("A new unique MFA token is needed to rotate the AWS access keys")
+	sess, err := u.newMFASession()
 	if err != nil {
 		return fmt.Errorf("unable to get mfa session: %w", err)
 	}
@@ -382,7 +383,7 @@ func (u *User) RotateAccessKeys(logger *log.Logger) error {
 
 	oldAccessKeyID := listAccessKeysOutput.AccessKeyMetadata[0].AccessKeyId
 
-	logger.Println("Creating new access key")
+	u.Logger.Println("Creating new access key")
 	newAccessKey, err := iamClient.CreateAccessKey(&iam.CreateAccessKeyInput{
 		UserName: aws.String(u.Name),
 	})
@@ -393,12 +394,12 @@ func (u *User) RotateAccessKeys(logger *log.Logger) error {
 	u.AccessKeyID = *newAccessKey.AccessKey.AccessKeyId
 	u.SecretAccessKey = *newAccessKey.AccessKey.SecretAccessKey
 
-	err = u.AddVaultProfile(logger)
+	err = u.AddVaultProfile()
 	if err != nil {
 		return fmt.Errorf("unable to add new credentials to aws-vault profile: %w", err)
 	}
 
-	logger.Println("Deleting old access key")
+	u.Logger.Println("Deleting old access key")
 	_, err = iamClient.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 		AccessKeyId: oldAccessKeyID,
 		UserName:    aws.String(u.Name),
@@ -413,7 +414,7 @@ func (u *User) RotateAccessKeys(logger *log.Logger) error {
 
 // AddVaultProfile uses aws-vault to store AWS credentials for the user's
 // profile.
-func (u *User) AddVaultProfile(logger *log.Logger) error {
+func (u *User) AddVaultProfile() error {
 	creds := credentials.Value{AccessKeyID: u.AccessKeyID, SecretAccessKey: u.SecretAccessKey}
 	provider := &vault.KeyringProvider{Keyring: *u.Keyring, Profile: u.BaseProfile.Name}
 
@@ -422,9 +423,9 @@ func (u *User) AddVaultProfile(logger *log.Logger) error {
 		return fmt.Errorf("unable to store credentials: %w", err)
 	}
 
-	logger.Printf("Added credentials to profile %q in vault", u.BaseProfile.Name)
+	u.Logger.Printf("Added credentials to profile %q in vault", u.BaseProfile.Name)
 
-	err = deleteSession(u.BaseProfile.Name, u.Config, u.Keyring, logger)
+	err = deleteSession(u.BaseProfile.Name, u.Config, u.Keyring, u.Logger)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -433,8 +434,8 @@ func (u *User) AddVaultProfile(logger *log.Logger) error {
 }
 
 // UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
-func (u *User) UpdateAWSConfigFile(logger *log.Logger) error {
-	logger.Printf("Updating the AWS config file: %s", u.Config.Path)
+func (u *User) UpdateAWSConfigFile() error {
+	u.Logger.Printf("Updating the AWS config file: %s", u.Config.Path)
 	// load the ini file
 	iniFile, err := ini.Load(u.Config.Path)
 	if err != nil {
@@ -477,9 +478,9 @@ func (u *User) UpdateAWSConfigFile(logger *log.Logger) error {
 }
 
 // RemoveVaultSession removes the aws-vault session for the profile.
-func (u *User) RemoveVaultSession(logger *log.Logger) error {
-	logger.Printf("Removing aws-vault session")
-	err := deleteSession(u.BaseProfile.Name, u.Config, u.Keyring, logger)
+func (u *User) RemoveVaultSession() error {
+	u.Logger.Printf("Removing aws-vault session")
+	err := deleteSession(u.BaseProfile.Name, u.Config, u.Keyring, u.Logger)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -668,6 +669,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 	user := User{
+		Logger:      logger,
 		Name:        iamUser,
 		BaseProfile: &baseProfile,
 		RoleProfile: &roleProfile,
@@ -685,7 +687,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	user.Setup(logger)
+	user.Setup()
 
 	// If we got this far, we win
 	logger.Println("Victory!")
