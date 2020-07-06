@@ -68,6 +68,7 @@ func TestCommandSuite(t *testing.T) {
 
 func (suite *commandTestSuite) TestAddProfileFlags() {
 	suite.Setup(AddProfileInitFlags, []string{
+		"--aws-profile", "test-id",
 		"--aws-profile-account", "test-new:012345678901",
 		"--iam-role", "engineer",
 	})
