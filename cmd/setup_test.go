@@ -10,9 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test logger
-var logger = log.New(os.Stdout, "", log.LstdFlags)
-
 func newConfigFile(t *testing.T, b []byte) string {
 	f, err := ioutil.TempFile("", "aws-config")
 	if err != nil {
@@ -26,11 +23,16 @@ func newConfigFile(t *testing.T, b []byte) string {
 
 func TestUpdateAWSConfigFile(t *testing.T) {
 
-	var defaultConfig = []byte(`[profile test]
+	// Test logger
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger.SetFlags(0)
+
+	var defaultSetupConfig = []byte(`[profile test]
 region=us-west-2
 output=json
 `)
-	f := newConfigFile(t, defaultConfig)
+
+	f := newConfigFile(t, defaultSetupConfig)
 	defer func() {
 		errRemove := os.Remove(f)
 		assert.NoError(t, errRemove)

@@ -9,7 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var defaultConfigAddProfile = []byte(`[profile test-id-base]
+func TestAddProfile(t *testing.T) {
+
+	// Test logger
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger.SetFlags(0)
+
+	var defaultConfigAddProfile = []byte(`[profile test-id-base]
 region=us-west-2
 output=json
 
@@ -20,12 +26,6 @@ role_arn=arn:aws:iam::222222222222:role/engineer
 region=us-west-2
 output=json
 `)
-
-func TestAddProfile(t *testing.T) {
-
-	// Test logger
-	logger := log.New(os.Stdout, "", log.LstdFlags)
-	logger.SetFlags(0)
 
 	f := newConfigFile(t, defaultConfigAddProfile)
 	defer func() {
