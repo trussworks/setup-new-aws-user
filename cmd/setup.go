@@ -25,7 +25,6 @@ import (
 )
 
 const maxNumAccessKeys = 2
-const maxMFATokenPromptAttempts = 5
 
 var validate *validator.Validate
 
@@ -88,73 +87,64 @@ func SetupUserCheckConfig(v *viper.Viper) error {
 
 // SetupConfig holds information for the AWS user being configured by this script
 type SetupConfig struct {
-	Logger     *log.Logger
-	Config     *vault.ConfigFile
+	DefaultConfig
+
 	QrTempFile *os.File
 	Keyring    *keyring.Keyring
 	NoMFA      bool
 
-	IAMUser   string
-	IAMRole   string
-	Partition string
-	Region    string
-	Output    string
-
-	BaseProfileName    string
-	BaseProfile        *vault.ProfileSection
-	AWSProfileAccounts []string
-	AWSProfiles        []vault.ProfileSection
-	MFASerial          string
+	BaseProfileName string
+	BaseProfile     *vault.ProfileSection
 
 	AccessKeyID     string
 	SecretAccessKey string
 }
 
-// Setup orchestrates the tasks to create the user's MFA and rotate access
-// keys.
-func (sc *SetupConfig) Setup() {
+// Run orchestrates the tasks to create the user's MFA and rotate access keys.
+func (sc *SetupConfig) Run() error {
 	err := sc.PromptAccessCredentials()
 	if err != nil {
-		sc.Logger.Fatal(err)
+		return err
 	}
 
 	err = sc.AddVaultProfile()
 	if err != nil {
-		sc.Logger.Fatal(err)
+		return err
 	}
 
 	if sc.NoMFA {
 		err = sc.GetMFADevice()
 		if err != nil {
-			sc.Logger.Fatal(err)
+			return err
 		}
 	} else {
 		err = sc.CreateVirtualMFADevice()
 		if err != nil {
-			sc.Logger.Fatal(err)
+			return err
 		}
 
 		err = sc.EnableVirtualMFADevice()
 		if err != nil {
-			sc.Logger.Fatal(err)
+			return err
 		}
 	}
 
 	err = sc.UpdateAWSConfigFile()
 	if err != nil {
-		sc.Logger.Fatal(err)
+		return err
 	}
 
 	err = sc.RemoveVaultSession()
 	if err != nil {
-		sc.Logger.Fatal(err)
+		return err
 	}
 
 	err = sc.RotateAccessKeys()
 	if err != nil {
-		sc.Logger.Fatal(err)
+		return err
 	}
 
+	return nil
 }
 
 // PromptAccessCredentials prompts the user for their AWS access key ID and
@@ -401,40 +391,6 @@ func (sc *SetupConfig) AddVaultProfile() error {
 	return nil
 }
 
-// UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
-func (sc *SetupConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string) error {
-	sc.Logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
-	sectionName := fmt.Sprintf("profile %s", profile.Name)
-
-	// Get or create section before updating
-	var err error
-	var section *ini.Section
-	section = iniFile.Section(sectionName)
-	if section == nil {
-		section, err = iniFile.NewSection(sectionName)
-		if err != nil {
-			return fmt.Errorf("error creating section %q: %w", profile.Name, err)
-		}
-	}
-
-	// Add the source profile when provided
-	if sourceProfile != nil {
-		_, err = section.NewKey("source_profile", *sourceProfile)
-		if err != nil {
-			return fmt.Errorf("unable to add source profile: %w", err)
-		}
-	}
-
-	if err = section.ReflectFrom(&profile); err != nil {
-		return fmt.Errorf("error mapping profile to ini file: %w", err)
-	}
-	_, err = section.NewKey("output", sc.Output)
-	if err != nil {
-		return fmt.Errorf("unable to add output key: %w", err)
-	}
-	return nil
-}
-
 // UpdateAWSConfigFile adds the user's AWS profile to the AWS config file
 func (sc *SetupConfig) UpdateAWSConfigFile() error {
 	sc.Logger.Printf("Updating the AWS config file: %s", sc.Config.Path)
@@ -588,25 +544,31 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 
 	setupConfig := SetupConfig{
 		// Config
-		Logger:     logger,
-		Config:     config,
 		QrTempFile: tempfile,
 		Keyring:    keyring,
 		NoMFA:      noMFA,
 
-		// Profile Inputs
-		IAMUser:   iamUser,
-		IAMRole:   iamRole,
-		Region:    awsRegion,
-		Partition: partition,
-		Output:    output,
-
 		// Profiles
-		BaseProfileName:    baseProfileName,
-		AWSProfileAccounts: awsProfileAccount,
+		BaseProfileName: baseProfileName,
 	}
 
-	setupConfig.Setup()
+	// Config
+	setupConfig.Logger = logger
+	setupConfig.Config = config
+
+	// Profile Inputs
+	setupConfig.IAMUser = iamUser
+	setupConfig.IAMRole = iamRole
+	setupConfig.Region = awsRegion
+	setupConfig.Partition = partition
+	setupConfig.Output = output
+
+	// Profiles
+	setupConfig.AWSProfileAccounts = awsProfileAccount
+
+	if err := setupConfig.Run(); err != nil {
+		logger.Fatal(err)
+	}
 
 	// If we got this far, we win
 	logger.Println("Victory!")

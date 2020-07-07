@@ -14,6 +14,8 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+const maxMFATokenPromptAttempts = 5
+
 func promptMFAtoken(messagePrefix string, logger *log.Logger) string {
 	var token string
 	for attempts := maxMFATokenPromptAttempts; token == "" && attempts > 0; attempts-- {
@@ -53,9 +55,25 @@ func getMFATokenPair(logger *log.Logger) MFATokenPair {
 	return mfaTokenPair
 }
 
+// DefaultConfig is the standard config struct for managing subcommand input
+type DefaultConfig struct {
+	Logger *log.Logger
+	Config *vault.ConfigFile
+
+	IAMUser   string
+	IAMRole   string
+	Partition string
+	Region    string
+	Output    string
+
+	AWSProfileAccounts []string
+	AWSProfiles        []vault.ProfileSection
+	MFASerial          string
+}
+
 // UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
-func UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string, output string, logger *log.Logger) error {
-	logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
+func (dc *DefaultConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string) error {
+	dc.Logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
 
 	sectionName := fmt.Sprintf("profile %s", profile.Name)
 
@@ -81,7 +99,7 @@ func UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourcePr
 	if err = section.ReflectFrom(&profile); err != nil {
 		return fmt.Errorf("error mapping profile to ini file: %w", err)
 	}
-	_, err = section.NewKey("output", output)
+	_, err = section.NewKey("output", dc.Output)
 	if err != nil {
 		return fmt.Errorf("unable to add output key: %w", err)
 	}

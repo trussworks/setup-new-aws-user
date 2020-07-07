@@ -62,20 +62,25 @@ output=json
 
 	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	addProfileConfig := AddProfileConfig{
-		// Config
-		Logger: suite.logger,
-		Config: config,
-
-		// Profile Inputs
-		IAMRole:   "test-role",
-		Region:    "us-west-2",
-		Partition: "aws",
-		Output:    "json",
-
-		// Profiles
-		AWSProfileAccounts: []string{"test-id-new:123456789012"},
-		AWSProfileName:     "test-id",
+		AWSProfileName: "test-id",
 	}
+
+	// Config
+	addProfileConfig.Logger = suite.logger
+	addProfileConfig.Config = config
+
+	// Profile Inputs
+	addProfileConfig.IAMUser = ""
+	addProfileConfig.IAMRole = "test-role"
+	addProfileConfig.Region = "us-west-2"
+	addProfileConfig.Partition = "aws"
+	addProfileConfig.Output = "json"
+
+	// Profiles
+	addProfileConfig.AWSProfileAccounts = []string{"test-id-new:123456789012"}
+	addProfileConfig.MFASerial = mfaSerial
+
+	// Add the profile
 	err = addProfileConfig.AddProfile()
 	suite.NoError(err)
 

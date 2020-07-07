@@ -59,23 +59,29 @@ output=json
 	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	setupConfig := SetupConfig{
 		// Config
-		Logger:     suite.logger,
-		Config:     config,
 		QrTempFile: nil,
 		Keyring:    keyring,
 
-		// Profile Inputs
-		IAMUser:   "test-user",
-		IAMRole:   "test-role",
-		Region:    "us-west-2",
-		Partition: "aws",
-		Output:    "json",
-
 		// Profiles
-		BaseProfileName:    "test-id-base",
-		AWSProfileAccounts: []string{"test-id:123456789012"},
-		MFASerial:          mfaSerial,
+		BaseProfileName: "test-id-base",
 	}
+
+	// Config
+	setupConfig.Logger = suite.logger
+	setupConfig.Config = config
+
+	// Profile Inputs
+	setupConfig.IAMUser = "test-user"
+	setupConfig.IAMRole = "test-role"
+	setupConfig.Region = "us-west-2"
+	setupConfig.Partition = "aws"
+	setupConfig.Output = "json"
+
+	// Profiles
+	setupConfig.AWSProfileAccounts = []string{"test-id:123456789012"}
+	setupConfig.MFASerial = mfaSerial
+
+	// Update the AWS Config for the test
 	err = setupConfig.UpdateAWSConfigFile()
 	suite.NoError(err)
 

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/ini.v1"
 )
 
@@ -57,54 +56,20 @@ func AddProfileCheckConfig(v *viper.Viper) error {
 	return nil
 }
 
-// AddProfileConfig holds information for the AWS user being configured by this script
+// AddProfileConfig holds information for the AWS profile configured by this script
 type AddProfileConfig struct {
-	Logger *log.Logger
-	Config *vault.ConfigFile
+	DefaultConfig
 
-	IAMRole   string
-	Partition string
-	Region    string
-	Output    string
-
-	BaseProfileName    string
-	AWSProfileName     string
-	AWSProfileAccounts []string
-	AWSProfiles        []vault.ProfileSection
-	MFASerial          string
+	BaseProfileName string
+	AWSProfileName  string
 }
 
-// UpdateAWSProfile updates or creates a single AWS profile to the AWS config file
-func (apc *AddProfileConfig) UpdateAWSProfile(iniFile *ini.File, profile *vault.ProfileSection, sourceProfile *string) error {
-	apc.Logger.Printf("Adding the profile %q to the AWS config file", profile.Name)
-	sectionName := fmt.Sprintf("profile %s", profile.Name)
-
-	// Get or create section before updating
-	var err error
-	var section *ini.Section
-	section = iniFile.Section(sectionName)
-	if section == nil {
-		section, err = iniFile.NewSection(sectionName)
-		if err != nil {
-			return fmt.Errorf("error creating section %q: %w", profile.Name, err)
-		}
+// Run orchestrates the tasks to add a new profile
+func (apc *AddProfileConfig) Run() error {
+	if err := apc.AddProfile(); err != nil {
+		return err
 	}
 
-	// Add the source profile when provided
-	if sourceProfile != nil {
-		_, err = section.NewKey("source_profile", *sourceProfile)
-		if err != nil {
-			return fmt.Errorf("unable to add source profile: %w", err)
-		}
-	}
-
-	if err = section.ReflectFrom(&profile); err != nil {
-		return fmt.Errorf("error mapping profile to ini file: %w", err)
-	}
-	_, err = section.NewKey("output", apc.Output)
-	if err != nil {
-		return fmt.Errorf("unable to add output key: %w", err)
-	}
 	return nil
 }
 
@@ -212,9 +177,6 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	iamRole := v.GetString(IAMRoleFlag)
 	output := v.GetString(OutputFlag)
 
-	// Validator used to validate input options for MFA
-	validate = validator.New()
-
 	// initialize things
 	partition, err := getPartition(awsRegion)
 	if err != nil {
@@ -226,23 +188,24 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 
-	addProfileConfig := AddProfileConfig{
-		// Config
-		Logger: logger,
-		Config: config,
+	// Setup new config
+	addProfileConfig := AddProfileConfig{}
 
-		// Profile Inputs
-		IAMRole:   iamRole,
-		Region:    awsRegion,
-		Partition: partition,
-		Output:    output,
+	// Config
+	addProfileConfig.Logger = logger
+	addProfileConfig.Config = config
 
-		// Profiles
-		AWSProfileAccounts: awsProfileAccount,
-		AWSProfileName:     awsProfile,
-	}
+	// Profile Inputs
+	addProfileConfig.IAMRole = iamRole
+	addProfileConfig.Region = awsRegion
+	addProfileConfig.Partition = partition
+	addProfileConfig.Output = output
 
-	if err := addProfileConfig.AddProfile(); err != nil {
+	// Profiles
+	addProfileConfig.AWSProfileAccounts = awsProfileAccount
+	addProfileConfig.AWSProfileName = awsProfile
+
+	if err := addProfileConfig.Run(); err != nil {
 		logger.Fatal(err)
 	}
 
