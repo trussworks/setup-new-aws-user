@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -96,20 +95,21 @@ func (suite *cliTestSuite) TestCheckRegion() {
 	}
 }
 
-func TestCheckProfileName(t *testing.T) {
+func (suite *cliTestSuite) TestCheckProfileName() {
+	suite.Setup()
 	testValues := []string{
 		"test-id",
 		"test-id1",
 		"test-id_1",
 	}
 	for _, testValue := range testValues {
-		assert.NoError(t, checkProfileName(testValue))
+		suite.NoError(checkProfileName(testValue))
 	}
 	testValuesWithErrors := []string{
 		"",
 	}
 	for _, testValue := range testValuesWithErrors {
-		assert.Error(t, checkProfileName(testValue))
+		suite.Error(checkProfileName(testValue))
 	}
 }
 
@@ -132,17 +132,17 @@ func (suite *cliTestSuite) TestCheckAccountID() {
 	}
 }
 
-func TestCheckProfileAccount(t *testing.T) {
-	v := viper.New()
+func (suite *cliTestSuite) TestCheckProfileAccount() {
+	suite.Setup()
 
 	testValues := [][]string{
 		{"test-id:012345678901"},
 		{"test-id1:012345678901", "test-id2:012345678901", "test-id3:012345678901"},
 	}
 	for _, testValue := range testValues {
-		v.Set(AWSProfileAccountFlag, testValue)
-		err := checkProfileAccount(v)
-		assert.NoError(t, err)
+		suite.viper.Set(AWSProfileAccountFlag, testValue)
+		err := checkProfileAccount(suite.viper)
+		suite.NoError(err)
 	}
 	testValuesWithErrors := [][]string{
 		{"test-id:0123456789011"},
@@ -151,9 +151,9 @@ func TestCheckProfileAccount(t *testing.T) {
 		{"test-id012345678901"},
 	}
 	for _, testValue := range testValuesWithErrors {
-		v.Set(AWSProfileAccountFlag, testValue)
-		err := checkProfileAccount(v)
-		assert.Error(t, err)
+		suite.viper.Set(AWSProfileAccountFlag, testValue)
+		err := checkProfileAccount(suite.viper)
+		suite.Error(err)
 	}
 }
 
