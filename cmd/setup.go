@@ -212,6 +212,17 @@ func (sc *SetupConfig) newMFASession() (*session.Session, error) {
 	return mfaSession, nil
 }
 
+func (sc *SetupConfig) deleteSession(profile string) error {
+	credsKeyring := vault.CredentialKeyring{Keyring: *sc.Keyring}
+	sessions := credsKeyring.Sessions()
+
+	if n, _ := sessions.Delete(profile); n > 0 {
+		sc.Logger.Printf("Deleted %d existing sessions.\n", n)
+	}
+
+	return nil
+}
+
 // GetMFADevice gets the user's existing virtual MFA device and updates the
 // MFA serial in the profile field.
 func (sc *SetupConfig) GetMFADevice() error {
@@ -383,7 +394,7 @@ func (sc *SetupConfig) AddVaultProfile() error {
 
 	sc.Logger.Printf("Added credentials to profile %q in vault", sc.BaseProfileName)
 
-	err := deleteSession(sc.BaseProfileName, sc.Keyring, sc.Logger)
+	err := sc.deleteSession(sc.BaseProfileName)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -443,7 +454,7 @@ func (sc *SetupConfig) UpdateAWSConfigFile() error {
 // RemoveVaultSession removes the aws-vault session for the profile.
 func (sc *SetupConfig) RemoveVaultSession() error {
 	sc.Logger.Printf("Removing aws-vault session")
-	err := deleteSession(sc.BaseProfile.Name, sc.Keyring, sc.Logger)
+	err := sc.deleteSession(sc.BaseProfile.Name)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}

@@ -123,17 +123,6 @@ func getKeyring(keychainName string) (*keyring.Keyring, error) {
 	return &ring, nil
 }
 
-func deleteSession(profile string, keyring *keyring.Keyring, logger *log.Logger) error {
-	credsKeyring := vault.CredentialKeyring{Keyring: *keyring}
-	sessions := credsKeyring.Sessions()
-
-	if n, _ := sessions.Delete(profile); n > 0 {
-		logger.Printf("Deleted %d existing sessions.\n", n)
-	}
-
-	return nil
-}
-
 func generateQrCode(payload string, tempFile *os.File) error {
 	// Creates QR Code
 	q, err := qrcode.New(payload, qrcode.Medium)
