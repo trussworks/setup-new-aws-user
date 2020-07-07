@@ -1,19 +1,43 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 
 	"github.com/99designs/aws-vault/vault"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestAddProfile(t *testing.T) {
+type addProfileTestSuite struct {
+	suite.Suite
+	logger *log.Logger
+}
 
-	// Test logger
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+func (suite *addProfileTestSuite) Setup() {
+	// Disable any logging that isn't attached to the logger unless using the verbose flag
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(0)
+
+	// Setup logger
+	var logger = log.New(os.Stdout, "", log.LstdFlags)
+
+	// Remove the flags for the logger
 	logger.SetFlags(0)
+	suite.SetLogger(logger)
+}
+
+func (suite *addProfileTestSuite) SetLogger(logger *log.Logger) {
+	suite.logger = logger
+}
+
+func TestAddProfileSuite(t *testing.T) {
+	suite.Run(t, &addProfileTestSuite{})
+}
+
+func (suite *addProfileTestSuite) TestAddProfile() {
+	suite.Setup()
 
 	var defaultConfigAddProfile = []byte(`[profile test-id-base]
 region=us-west-2
@@ -27,19 +51,19 @@ region=us-west-2
 output=json
 `)
 
-	f := newConfigFile(t, defaultConfigAddProfile)
+	f := newConfigFile(suite.T(), defaultConfigAddProfile)
 	defer func() {
 		errRemove := os.Remove(f)
-		assert.NoError(t, errRemove)
+		suite.NoError(errRemove)
 	}()
 
 	config, err := vault.LoadConfig(f)
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	addProfileConfig := AddProfileConfig{
 		// Config
-		Logger: logger,
+		Logger: suite.logger,
 		Config: config,
 
 		// Profile Inputs
@@ -53,17 +77,17 @@ output=json
 		AWSProfileName:     "test-id",
 	}
 	err = addProfileConfig.AddProfile()
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	// re-load the config file
 	config, err = vault.LoadConfig(f)
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	testSection, ok := config.ProfileSection("test-id-new")
-	assert.True(t, ok)
-	assert.Equal(t, testSection.SourceProfile, "test-id-base")
-	assert.Equal(t, testSection.MfaSerial, mfaSerial)
-	assert.Equal(t, testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
-	assert.Equal(t, testSection.Region, "us-west-2")
-	// assert.Equal(t, testBaseSection.Output, "json")
+	suite.True(ok)
+	suite.Equal(testSection.SourceProfile, "test-id-base")
+	suite.Equal(testSection.MfaSerial, mfaSerial)
+	suite.Equal(testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
+	suite.Equal(testSection.Region, "us-west-2")
+	// suite.Equal(testBaseSection.Outpu"json")
 }

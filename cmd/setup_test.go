@@ -1,41 +1,65 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 
 	"github.com/99designs/aws-vault/vault"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestUpdateAWSConfigFile(t *testing.T) {
+type setupTestSuite struct {
+	suite.Suite
+	logger *log.Logger
+}
 
-	// Test logger
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+func (suite *setupTestSuite) Setup() {
+	// Disable any logging that isn't attached to the logger unless using the verbose flag
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(0)
+
+	// Setup logger
+	var logger = log.New(os.Stdout, "", log.LstdFlags)
+
+	// Remove the flags for the logger
 	logger.SetFlags(0)
+	suite.SetLogger(logger)
+}
+
+func (suite *setupTestSuite) SetLogger(logger *log.Logger) {
+	suite.logger = logger
+}
+
+func TestSetupSuite(t *testing.T) {
+	suite.Run(t, &setupTestSuite{})
+}
+
+func (suite *setupTestSuite) TestUpdateAWSConfigFile() {
+	suite.Setup()
 
 	var defaultSetupConfig = []byte(`[profile test]
 region=us-west-2
 output=json
 `)
 
-	f := newConfigFile(t, defaultSetupConfig)
+	f := newConfigFile(suite.T(), defaultSetupConfig)
 	defer func() {
 		errRemove := os.Remove(f)
-		assert.NoError(t, errRemove)
+		suite.NoError(errRemove)
 	}()
 
 	config, err := vault.LoadConfig(f)
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	keyring, err := getKeyring("test")
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	setupConfig := SetupConfig{
 		// Config
-		Logger:     logger,
+		Logger:     suite.logger,
 		Config:     config,
 		QrTempFile: nil,
 		Keyring:    keyring,
@@ -53,23 +77,23 @@ output=json
 		MFASerial:          mfaSerial,
 	}
 	err = setupConfig.UpdateAWSConfigFile()
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	// re-load the config file
 	config, err = vault.LoadConfig(f)
-	assert.NoError(t, err)
+	suite.NoError(err)
 
 	testBaseSection, ok := config.ProfileSection("test-id-base")
-	assert.True(t, ok)
-	assert.Equal(t, len(testBaseSection.MfaSerial), 0)
-	assert.Equal(t, testBaseSection.Region, "us-west-2")
-	// assert.Equal(t, testBaseSection.Output, "json")
+	suite.True(ok)
+	suite.Equal(len(testBaseSection.MfaSerial), 0)
+	suite.Equal(testBaseSection.Region, "us-west-2")
+	// suite.Equal(testBaseSection.Output, "json")
 
 	testSection, ok := config.ProfileSection("test-id")
-	assert.True(t, ok)
-	assert.Equal(t, testSection.SourceProfile, "test-id-base")
-	assert.Equal(t, testSection.MfaSerial, mfaSerial)
-	assert.Equal(t, testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
-	assert.Equal(t, testSection.Region, "us-west-2")
-	// assert.Equal(t, testBaseSection.Output, "json")
+	suite.True(ok)
+	suite.Equal(testSection.SourceProfile, "test-id-base")
+	suite.Equal(testSection.MfaSerial, mfaSerial)
+	suite.Equal(testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
+	suite.Equal(testSection.Region, "us-west-2")
+	// suite.Equal(testBaseSection.Output, "json")
 }
