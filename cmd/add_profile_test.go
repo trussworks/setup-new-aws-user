@@ -36,6 +36,7 @@ output=json
 	config, err := vault.LoadConfig(f)
 	assert.NoError(t, err)
 
+	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	addProfileConfig := AddProfileConfig{
 		// Config
 		Logger: logger,
@@ -48,11 +49,21 @@ output=json
 		Output:    "json",
 
 		// Profiles
-		AWSProfileAccounts: []string{"test-id:123456789012"},
+		AWSProfileAccounts: []string{"test-id-new:123456789012"},
 		AWSProfileName:     "test-id",
 	}
 	err = addProfileConfig.AddProfile()
 	assert.NoError(t, err)
 
-	// TODO: Check contents of file
+	// re-load the config file
+	config, err = vault.LoadConfig(f)
+	assert.NoError(t, err)
+
+	testSection, ok := config.ProfileSection("test-id-new")
+	assert.True(t, ok)
+	assert.Equal(t, testSection.SourceProfile, "test-id-base")
+	assert.Equal(t, testSection.MfaSerial, mfaSerial)
+	assert.Equal(t, testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
+	assert.Equal(t, testSection.Region, "us-west-2")
+	// assert.Equal(t, testBaseSection.Output, "json")
 }
