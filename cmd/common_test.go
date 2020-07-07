@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 func newConfigFile(t *testing.T, b []byte) string {
@@ -19,27 +19,35 @@ func newConfigFile(t *testing.T, b []byte) string {
 	return f.Name()
 }
 
-func TestGenerateQrCode(t *testing.T) {
+type commonTestSuite struct {
+	suite.Suite
+}
+
+func TestCommonSuite(t *testing.T) {
+	suite.Run(t, &commonTestSuite{})
+}
+
+func (suite *commonTestSuite) TestGenerateQrCode() {
 	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
-	assert.NoError(t, err)
+	suite.NoError(err)
 	defer func() {
 		errRemove := os.Remove(tempFile.Name())
-		assert.NoError(t, errRemove)
+		suite.NoError(errRemove)
 	}()
 
 	err = generateQrCode("otpauth://totp/super@top?secret=secret", tempFile)
-	assert.NoError(t, err)
+	suite.NoError(err)
 }
 
-func TestGetPartition(t *testing.T) {
+func (suite *commonTestSuite) TestGetPartition() {
 	commPartition, err := getPartition("us-west-2")
-	assert.Equal(t, commPartition, "aws")
-	assert.NoError(t, err)
+	suite.Equal(commPartition, "aws")
+	suite.NoError(err)
 
 	govPartition, err := getPartition("us-gov-west-1")
-	assert.Equal(t, govPartition, "aws-us-gov")
-	assert.NoError(t, err)
+	suite.Equal(govPartition, "aws-us-gov")
+	suite.NoError(err)
 
 	_, err = getPartition("aws-under-the-sea")
-	assert.Error(t, err)
+	suite.Error(err)
 }
