@@ -36,9 +36,12 @@ output=json
 		assert.NoError(t, errRemove)
 	}()
 
-	config, _ := vault.LoadConfig(f)
+	config, err := vault.LoadConfig(f)
+	assert.NoError(t, err)
+
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
+
 	setupConfig := SetupConfig{
 		// Config
 		Logger:     logger,
@@ -59,6 +62,8 @@ output=json
 	}
 	err = setupConfig.UpdateAWSConfigFile()
 	assert.NoError(t, err)
+
+	// TODO: Check contents of file
 }
 
 func TestGenerateQrCode(t *testing.T) {
