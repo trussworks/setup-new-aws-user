@@ -42,7 +42,7 @@ func TestExistingAWSProfile(t *testing.T) {
 	}
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
-	user := User{
+	setupConfig := SetupConfig{
 		Logger:      logger,
 		Name:        "test",
 		BaseProfile: &baseProfile,
@@ -52,9 +52,9 @@ func TestExistingAWSProfile(t *testing.T) {
 		Keyring:     keyring,
 	}
 
-	err = checkExistingAWSProfile(baseProfile.Name, user.Config, logger)
+	err = checkExistingAWSProfile(baseProfile.Name, setupConfig.Config, logger)
 	assert.Error(t, err)
-	err = checkExistingAWSProfile("missing", user.Config, logger)
+	err = checkExistingAWSProfile("missing", setupConfig.Config, logger)
 	assert.NoError(t, err)
 }
 
@@ -76,7 +76,7 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 	config, _ := vault.LoadConfig(f)
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
-	user := User{
+	setupConfig := SetupConfig{
 		Logger:      logger,
 		Name:        "test-user",
 		BaseProfile: &baseProfile,
@@ -86,7 +86,7 @@ func TestUpdateAWSConfigFile(t *testing.T) {
 		QrTempFile:  nil,
 		Keyring:     keyring,
 	}
-	err = user.UpdateAWSConfigFile()
+	err = setupConfig.UpdateAWSConfigFile()
 	assert.NoError(t, err)
 }
 
