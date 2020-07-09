@@ -47,7 +47,7 @@ output=json
 	config, _ := vault.LoadConfig(f)
 	keyring, err := getKeyring("test")
 	assert.NoError(t, err)
-	user := User{
+	setupConfig := SetupConfig{
 		Logger:      logger,
 		Name:        "test-user",
 		BaseProfile: &baseProfile,
@@ -57,7 +57,7 @@ output=json
 		QrTempFile:  nil,
 		Keyring:     keyring,
 	}
-	err = user.UpdateAWSConfigFile()
+	err = setupConfig.UpdateAWSConfigFile()
 	assert.NoError(t, err)
 }
 
