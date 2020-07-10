@@ -35,11 +35,11 @@ output=json
 		errRemove := os.Remove(f)
 		assert.NoError(t, errRemove)
 	}()
-	baseProfile := vault.Profile{
+	baseProfile := vault.ProfileSection{
 		Name:   "test-base",
 		Region: "us-west-2",
 	}
-	roleProfile := vault.Profile{
+	roleProfile := vault.ProfileSection{
 		Name:   "test-role",
 		Region: "us-west-2",
 	}

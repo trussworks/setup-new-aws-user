@@ -90,10 +90,10 @@ func setupUserCheckConfig(v *viper.Viper) error {
 type SetupConfig struct {
 	Logger          *log.Logger
 	Name            string
-	BaseProfile     *vault.Profile
-	RoleProfile     *vault.Profile
+	BaseProfile     *vault.ProfileSection
+	RoleProfile     *vault.ProfileSection
 	Output          string
-	Config          *vault.Config
+	Config          *vault.ConfigFile
 	AccessKeyID     string
 	SecretAccessKey string
 	QrTempFile      *os.File
@@ -191,7 +191,7 @@ func (sc *SetupConfig) newMFASession() (*session.Session, error) {
 	}
 	stsClient := sts.New(basicSession)
 	getSessionTokenOutput, err := stsClient.GetSessionToken(&sts.GetSessionTokenInput{
-		SerialNumber: aws.String(sc.BaseProfile.MFASerial),
+		SerialNumber: aws.String(sc.BaseProfile.MfaSerial),
 		TokenCode:    aws.String(mfaToken),
 	})
 	if err != nil {
@@ -241,8 +241,8 @@ func (sc *SetupConfig) GetMFADevice() error {
 	}
 	mfaDevice := mfaDeviceOutput.MFADevices[0]
 
-	sc.BaseProfile.MFASerial = *mfaDevice.SerialNumber
-	sc.RoleProfile.MFASerial = *mfaDevice.SerialNumber
+	sc.BaseProfile.MfaSerial = *mfaDevice.SerialNumber
+	sc.RoleProfile.MfaSerial = *mfaDevice.SerialNumber
 
 	return nil
 }
@@ -267,8 +267,8 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 		return fmt.Errorf("unable to create virtual MFA: %w", err)
 	}
 
-	sc.BaseProfile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
-	sc.RoleProfile.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	sc.BaseProfile.MfaSerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	sc.RoleProfile.MfaSerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
 
 	// For the QR code, create a string that encodes:
 	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
@@ -333,7 +333,7 @@ func getMFATokenPair(logger *log.Logger) MFATokenPair {
 // EnableVirtualMFADevice enables the user's MFA device
 func (sc *SetupConfig) EnableVirtualMFADevice() error {
 	sc.Logger.Println("Enabling the virtual MFA device")
-	if sc.BaseProfile.MFASerial == "" {
+	if sc.BaseProfile.MfaSerial == "" {
 		return fmt.Errorf("profile MFA serial must be set")
 	}
 
@@ -348,7 +348,7 @@ func (sc *SetupConfig) EnableVirtualMFADevice() error {
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
 		AuthenticationCode2: aws.String(mfaTokenPair.Token2),
-		SerialNumber:        aws.String(sc.BaseProfile.MFASerial),
+		SerialNumber:        aws.String(sc.BaseProfile.MfaSerial),
 		UserName:            aws.String(sc.Name),
 	}
 
@@ -416,16 +416,16 @@ func (sc *SetupConfig) RotateAccessKeys() error {
 // profile.
 func (sc *SetupConfig) AddVaultProfile() error {
 	creds := credentials.Value{AccessKeyID: sc.AccessKeyID, SecretAccessKey: sc.SecretAccessKey}
-	provider := &vault.KeyringProvider{Keyring: *sc.Keyring, Profile: sc.BaseProfile.Name}
 
-	err := provider.Store(creds)
-	if err != nil {
-		return fmt.Errorf("unable to store credentials: %w", err)
+	ckr := &vault.CredentialKeyring{Keyring: *sc.Keyring}
+	errSet := ckr.Set(sc.BaseProfile.Name, creds)
+	if errSet != nil {
+		return fmt.Errorf("unable to set base profile credentials: %w", errSet)
 	}
 
 	sc.Logger.Printf("Added credentials to profile %q in vault", sc.BaseProfile.Name)
 
-	err = deleteSession(sc.BaseProfile.Name, sc.Config, sc.Keyring, sc.Logger)
+	err := deleteSession(sc.BaseProfile.Name, sc.Keyring, sc.Logger)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -480,7 +480,7 @@ func (sc *SetupConfig) UpdateAWSConfigFile() error {
 // RemoveVaultSession removes the aws-vault session for the profile.
 func (sc *SetupConfig) RemoveVaultSession() error {
 	sc.Logger.Printf("Removing aws-vault session")
-	err := deleteSession(sc.BaseProfile.Name, sc.Config, sc.Keyring, sc.Logger)
+	err := deleteSession(sc.BaseProfile.Name, sc.Keyring, sc.Logger)
 	if err != nil {
 		return fmt.Errorf("unable to delete session: %w", err)
 	}
@@ -505,11 +505,9 @@ func getKeyring(keychainName string) (*keyring.Keyring, error) {
 	return &ring, nil
 }
 
-func deleteSession(profile string, awsConfig *vault.Config, keyring *keyring.Keyring, logger *log.Logger) error {
-	sessions, err := vault.NewKeyringSessions(*keyring, awsConfig)
-	if err != nil {
-		return fmt.Errorf("unable to create new keyring session: %w", err)
-	}
+func deleteSession(profile string, keyring *keyring.Keyring, logger *log.Logger) error {
+	credsKeyring := vault.CredentialKeyring{Keyring: *keyring}
+	sessions := credsKeyring.Sessions()
 
 	if n, _ := sessions.Delete(profile); n > 0 {
 		logger.Printf("Deleted %d existing sessions.\n", n)
@@ -620,14 +618,14 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		logger.Fatal(err)
 	}
 
-	baseProfile := vault.Profile{
+	baseProfile := vault.ProfileSection{
 		Name: fmt.Sprintf("%s-base",
 			awsVaultProfile,
 		),
 		Region: awsRegion,
 	}
 
-	roleProfile := vault.Profile{
+	roleProfile := vault.ProfileSection{
 		Name: awsVaultProfile,
 		RoleARN: fmt.Sprintf("arn:%s:iam::%s:role/%s",
 			partition,
