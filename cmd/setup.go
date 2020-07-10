@@ -549,16 +549,6 @@ func openQrCode(tempFile *os.File) error {
 	return nil
 }
 
-func checkExistingAWSProfile(profileName string, config *vault.ConfigFile, logger *log.Logger) error {
-	logger.Printf("Checking whether profile %q exists in AWS config file\n", profileName)
-	_, exists := config.ProfileSection(profileName)
-	if exists {
-		return fmt.Errorf("Profile already exists in AWS config file: %s", profileName)
-	}
-
-	return nil
-}
-
 func getPartition(region string) (string, error) {
 	partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), region)
 	if !ok {
@@ -676,14 +666,6 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 		QrTempFile:  tempfile,
 		Keyring:     keyring,
 		NoMFA:       noMFA,
-	}
-	err = checkExistingAWSProfile(baseProfile.Name, config, logger)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	err = checkExistingAWSProfile(roleProfile.Name, config, logger)
-	if err != nil {
-		logger.Fatal(err)
 	}
 	setupConfig.Setup()
 

@@ -13,11 +13,6 @@ import (
 // Test logger
 var logger = log.New(os.Stdout, "", log.LstdFlags)
 
-var defaultConfig = []byte(`[profile test]
-region=us-west-2
-output=json
-`)
-
 func newConfigFile(t *testing.T, b []byte) string {
 	f, err := ioutil.TempFile("", "aws-config")
 	if err != nil {
@@ -29,36 +24,12 @@ func newConfigFile(t *testing.T, b []byte) string {
 	return f.Name()
 }
 
-func TestExistingAWSProfile(t *testing.T) {
-	f := newConfigFile(t, defaultConfig)
-	defer func() {
-		errRemove := os.Remove(f)
-		assert.NoError(t, errRemove)
-	}()
-	config, _ := vault.LoadConfig(f)
-	baseProfile := vault.ProfileSection{
-		Name:   "test",
-		Region: "us-west-2",
-	}
-	keyring, err := getKeyring("test")
-	assert.NoError(t, err)
-	setupConfig := SetupConfig{
-		Logger:      logger,
-		Name:        "test",
-		BaseProfile: &baseProfile,
-		Output:      "json",
-		Config:      config,
-		QrTempFile:  nil,
-		Keyring:     keyring,
-	}
-
-	err = checkExistingAWSProfile(baseProfile.Name, setupConfig.Config, logger)
-	assert.Error(t, err)
-	err = checkExistingAWSProfile("missing", setupConfig.Config, logger)
-	assert.NoError(t, err)
-}
-
 func TestUpdateAWSConfigFile(t *testing.T) {
+
+	var defaultConfig = []byte(`[profile test]
+region=us-west-2
+output=json
+`)
 	f := newConfigFile(t, defaultConfig)
 	defer func() {
 		errRemove := os.Remove(f)
