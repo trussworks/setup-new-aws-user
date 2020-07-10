@@ -302,8 +302,8 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 // EnableVirtualMFADevice enables the user's MFA device
 func (sc *SetupConfig) EnableVirtualMFADevice() error {
 	sc.Logger.Println("Enabling the virtual MFA device")
-	if sc.BaseProfile.MfaSerial == "" {
-		return fmt.Errorf("profile MFA serial must be set")
+	if sc.MFASerial == "" {
+		return errors.New("profile MFA serial must be set")
 	}
 
 	mfaTokenPair := getMFATokenPair(sc.Logger)
@@ -317,7 +317,7 @@ func (sc *SetupConfig) EnableVirtualMFADevice() error {
 	enableMFADeviceInput := &iam.EnableMFADeviceInput{
 		AuthenticationCode1: aws.String(mfaTokenPair.Token1),
 		AuthenticationCode2: aws.String(mfaTokenPair.Token2),
-		SerialNumber:        aws.String(sc.BaseProfile.MfaSerial),
+		SerialNumber:        aws.String(sc.MFASerial),
 		UserName:            aws.String(sc.IAMUser),
 	}
 
