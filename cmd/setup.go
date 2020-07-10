@@ -283,7 +283,7 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 	// https://docs.aws.amazon.com/sdk-for-go/api/service/iam/#VirtualMFADevice
 	content := fmt.Sprintf("otpauth://totp/%s@%s?secret=%s",
 		*mfaDeviceInput.VirtualMFADeviceName,
-		sc.BaseProfile.Name,
+		sc.BaseProfileName,
 		mfaDeviceOutput.VirtualMFADevice.Base32StringSeed,
 	)
 
