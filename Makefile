@@ -17,7 +17,7 @@ bin/setup-new-aws-user: ## Build setup-new-aws-user
 
 .PHONY: test
 test:
-	go test ./cmd/...
+	go test -v ./cmd/...
 
 .PHONY: clean
 clean:
