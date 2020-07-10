@@ -150,6 +150,9 @@ region=us-west-2
 output=json
 ```
 
+**NOTE:** If you supply an aws-profile name that already exists in '~/.aws/config` this script will rewrite
+that profile in your config.
+
 ### setup-new-aws-user version
 
 To get the version of the tool run:
