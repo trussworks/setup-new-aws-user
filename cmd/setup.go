@@ -277,6 +277,7 @@ func (sc *SetupConfig) CreateVirtualMFADevice() error {
 	}
 
 	sc.MFASerial = *mfaDeviceOutput.VirtualMFADevice.SerialNumber
+	sc.Logger.Printf("Generated new virtual MFA device: %q\n", sc.MFASerial)
 
 	// For the QR code, create a string that encodes:
 	// otpauth://totp/$virtualMFADeviceName@$AccountName?secret=$Base32String
@@ -320,6 +321,7 @@ func (sc *SetupConfig) EnableVirtualMFADevice() error {
 		SerialNumber:        aws.String(sc.MFASerial),
 		UserName:            aws.String(sc.IAMUser),
 	}
+	sc.Logger.Printf("Enabled virtual MFA device: %q\n", sc.MFASerial)
 
 	_, err = svc.EnableMFADevice(enableMFADeviceInput)
 	if err != nil {
