@@ -116,7 +116,7 @@ func (e *errInvalidAccountID) Error() string {
 
 func checkAccountID(v *viper.Viper) error {
 	id := v.GetString(AWSAccountIDFlag)
-	if matched, err := regexp.Match(`\d[12]`, []byte(id)); !matched || err != nil {
+	if matched, err := regexp.Match(`^\d{12}$`, []byte(id)); !matched || err != nil {
 		return fmt.Errorf("%s must be a 12 digit number: %w", AWSAccountIDFlag, &errInvalidAccountID{AccountID: id})
 	}
 
