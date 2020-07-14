@@ -131,3 +131,32 @@ set):
 ```shell
 AWS_VAULT_KEYCHAIN_NAME=login aws-vault exec test-profile-name -- aws sts get-caller-identity
 ```
+
+### Troubleshooting
+
+#### User partially creates MFA device
+
+The user might find themselves in an odd situation where the virtual MFA device was created but not assigned to the
+user. This will prevent the user from coming back to the setup script and completing it. Here are steps to resolve if
+the vMFA was created with no assigned user:
+
+```sh
+aws iam list-virtual-mfa-devices
+# Find device with serial format of `arn:aws:iam::<AWS_ACCOUNT_ID>:mfa/<IAM_USERNAME>`
+# It may be listed without a User associated with it.
+SERIAL=arn:aws:iam::<AWS_ACCOUNT_ID>:mfa/<IAM_USERNAME>
+aws iam delete-virtual-mfa-device --serial-number "$SERIAL"
+```
+
+If the device was registered to a user it may need to be deactivated first, in which case its easier to find the
+`SERIAL` programatically:
+
+
+```sh
+export USERNAME=somebody
+SERIAL=$(aws iam list-mfa-devices --user-name "${USERNAME}" | jq -r ".MFADevices[].SerialNumber")
+aws iam deactivate-mfa-device --user-name "${USERNAME}" --serial-number "${SERIAL}"
+aws iam delete-virtual-mfa-device --serial-number "$SERIAL"
+```
+
+Now the device should be completely removed. Have them re-run the script.
