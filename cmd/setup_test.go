@@ -7,81 +7,99 @@ import (
 	"testing"
 
 	"github.com/99designs/aws-vault/vault"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// Test logger
-var logger = log.New(os.Stdout, "", log.LstdFlags)
-
-func newConfigFile(t *testing.T, b []byte) string {
-	f, err := ioutil.TempFile("", "aws-config")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(f.Name(), b, 0600); err != nil {
-		t.Fatal(err)
-	}
-	return f.Name()
+type setupTestSuite struct {
+	suite.Suite
+	logger *log.Logger
 }
 
-func TestUpdateAWSConfigFile(t *testing.T) {
+func (suite *setupTestSuite) Setup() {
+	// Disable any logging that isn't attached to the logger unless using the verbose flag
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(0)
 
-	var defaultConfig = []byte(`[profile test]
+	// Setup logger
+	var logger = log.New(os.Stdout, "", log.LstdFlags)
+
+	// Remove the flags for the logger
+	logger.SetFlags(0)
+	suite.SetLogger(logger)
+}
+
+func (suite *setupTestSuite) SetLogger(logger *log.Logger) {
+	suite.logger = logger
+}
+
+func TestSetupSuite(t *testing.T) {
+	suite.Run(t, &setupTestSuite{})
+}
+
+func (suite *setupTestSuite) TestUpdateAWSConfigFile() {
+	suite.Setup()
+
+	var defaultSetupConfig = []byte(`[profile test]
 region=us-west-2
 output=json
 `)
-	f := newConfigFile(t, defaultConfig)
+
+	f := newConfigFile(suite.T(), defaultSetupConfig)
 	defer func() {
 		errRemove := os.Remove(f)
-		assert.NoError(t, errRemove)
+		suite.NoError(errRemove)
 	}()
-	baseProfile := vault.ProfileSection{
-		Name:   "test-base",
-		Region: "us-west-2",
-	}
-	roleProfile := vault.ProfileSection{
-		Name:   "test-role",
-		Region: "us-west-2",
-	}
 
-	config, _ := vault.LoadConfig(f)
+	config, err := vault.LoadConfig(f)
+	suite.NoError(err)
+
 	keyring, err := getKeyring("test")
-	assert.NoError(t, err)
+	suite.NoError(err)
+
+	mfaSerial := "arn:aws:iam::111111111111:mfa/test-user"
 	setupConfig := SetupConfig{
-		Logger:      logger,
-		Name:        "test-user",
-		BaseProfile: &baseProfile,
-		RoleProfile: &roleProfile,
-		Output:      "json",
-		Config:      config,
-		QrTempFile:  nil,
-		Keyring:     keyring,
+		// Config
+		QrTempFile: nil,
+		Keyring:    keyring,
+
+		// Profiles
+		BaseProfileName: "test-id-base",
 	}
+
+	// Config
+	setupConfig.Logger = suite.logger
+	setupConfig.Config = config
+
+	// Profile Inputs
+	setupConfig.IAMUser = "test-user"
+	setupConfig.IAMRole = "test-role"
+	setupConfig.Region = "us-west-2"
+	setupConfig.Partition = "aws"
+	setupConfig.Output = "json"
+
+	// Profiles
+	setupConfig.AWSProfileAccounts = []string{"test-id:123456789012"}
+	setupConfig.MFASerial = mfaSerial
+
+	// Update the AWS Config for the test
 	err = setupConfig.UpdateAWSConfigFile()
-	assert.NoError(t, err)
-}
+	suite.NoError(err)
 
-func TestGenerateQrCode(t *testing.T) {
-	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
-	assert.NoError(t, err)
-	defer func() {
-		errRemove := os.Remove(tempFile.Name())
-		assert.NoError(t, errRemove)
-	}()
+	// re-load the config file
+	config, err = vault.LoadConfig(f)
+	suite.NoError(err)
 
-	err = generateQrCode("otpauth://totp/super@top?secret=secret", tempFile)
-	assert.NoError(t, err)
-}
+	testBaseSection, ok := config.ProfileSection("test-id-base")
+	suite.True(ok)
+	suite.Equal(len(testBaseSection.MfaSerial), 0)
+	suite.Equal(testBaseSection.Region, "us-west-2")
+	// suite.Equal(testBaseSection.Output, "json")
 
-func TestGetPartition(t *testing.T) {
-	commPartition, err := getPartition("us-west-2")
-	assert.Equal(t, commPartition, "aws")
-	assert.NoError(t, err)
-
-	govPartition, err := getPartition("us-gov-west-1")
-	assert.Equal(t, govPartition, "aws-us-gov")
-	assert.NoError(t, err)
-
-	_, err = getPartition("aws-under-the-sea")
-	assert.Error(t, err)
+	testSection, ok := config.ProfileSection("test-id")
+	suite.True(ok)
+	suite.Equal(testSection.SourceProfile, "test-id-base")
+	suite.Equal(testSection.MfaSerial, mfaSerial)
+	suite.Equal(testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
+	suite.Equal(testSection.Region, "us-west-2")
+	// suite.Equal(testBaseSection.Output, "json")
 }

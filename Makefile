@@ -1,5 +1,5 @@
 # goreleaser removes the `v` prefix when building and this does too
-VERSION = 0.0.1
+VERSION = 0.5.0
 
 ifdef CIRCLECI
 	UNAME_S := $(shell uname -s)
@@ -18,6 +18,11 @@ bin/setup-new-aws-user: ## Build setup-new-aws-user
 .PHONY: test
 test:
 	go test -v ./cmd/...
+
+.PHONY: test_coverage
+test_coverage:
+	go test -v -coverprofile=coverage.out -covermode=count ./cmd/...
+	go tool cover -html=coverage.out
 
 .PHONY: clean
 clean:

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/spf13/viper"
@@ -11,15 +12,18 @@ import (
 const (
 	// AWSRegionFlag is the generic AWS Region Flag
 	AWSRegionFlag string = "aws-region"
-	// AWSAccountIDFlag is the AWS AccountID Flag
-	AWSAccountIDFlag string = "aws-account-id"
 
 	// VaultAWSKeychainNameFlag is the aws-vault keychain name Flag
 	VaultAWSKeychainNameFlag string = "aws-vault-keychain-name"
 	// VaultAWSKeychainNameDefault is the aws-vault default keychain name
 	VaultAWSKeychainNameDefault string = "login"
-	// VaultAWSProfileFlag is the aws-vault profile name Flag
-	VaultAWSProfileFlag string = "aws-profile"
+
+	// AWSProfileAccountFlag is the combined AWS profile name and account ID Flag
+	AWSProfileAccountFlag string = "aws-profile-account"
+	// AWSBaseProfileFlag is the AWS base profile name Flag
+	AWSBaseProfileFlag string = "aws-base-profile"
+	// AWSProfileFlag is the AWS Profile flag
+	AWSProfileFlag string = "aws-profile"
 
 	// IAMUserFlag is the IAM User name Flag
 	IAMUserFlag string = "iam-user"
@@ -53,23 +57,6 @@ func (e *errInvalidKeychainName) Error() string {
 	return fmt.Sprintf("invalid keychain name '%s'", e.KeychainName)
 }
 
-type errInvalidAWSProfile struct {
-	Profile string
-}
-
-func (e *errInvalidAWSProfile) Error() string {
-	return fmt.Sprintf("invalid aws profile '%s'", e.Profile)
-}
-
-type errInvalidVault struct {
-	KeychainName string
-	Profile      string
-}
-
-func (e *errInvalidVault) Error() string {
-	return fmt.Sprintf("invalid keychain name %q or profile %q", e.KeychainName, e.Profile)
-}
-
 func checkVault(v *viper.Viper) error {
 	// Both keychain name and profile are required or both must be missing
 	keychainName := v.GetString(VaultAWSKeychainNameFlag)
@@ -78,11 +65,6 @@ func checkVault(v *viper.Viper) error {
 	}
 	if len(keychainName) > 0 && !stringSliceContains(keychainNames, keychainName) {
 		return fmt.Errorf("%s is invalid, expected %v: %w", VaultAWSKeychainNameFlag, keychainNames, &errInvalidKeychainName{KeychainName: keychainName})
-	}
-
-	awsProfile := v.GetString(VaultAWSProfileFlag)
-	if len(awsProfile) == 0 {
-		return fmt.Errorf("%s must not be empty: %w", VaultAWSProfileFlag, &errInvalidAWSProfile{Profile: awsProfile})
 	}
 
 	return nil
@@ -96,6 +78,7 @@ func (e *errInvalidRegion) Error() string {
 	return fmt.Sprintf("invalid region %q", e.Region)
 }
 
+// Note: Testing the partition is not really the best check here, but its sufficient
 func checkRegion(v *viper.Viper) error {
 
 	r := v.GetString(AWSRegionFlag)
@@ -114,12 +97,57 @@ func (e *errInvalidAccountID) Error() string {
 	return fmt.Sprintf("invalid Account ID %q", e.AccountID)
 }
 
-func checkAccountID(v *viper.Viper) error {
-	id := v.GetString(AWSAccountIDFlag)
+func checkAccountID(id string) error {
 	if matched, err := regexp.Match(`^\d{12}$`, []byte(id)); !matched || err != nil {
-		return fmt.Errorf("%s must be a 12 digit number: %w", AWSAccountIDFlag, &errInvalidAccountID{AccountID: id})
+		return fmt.Errorf("AWS Account ID must be a 12 digit number: %w", &errInvalidAccountID{AccountID: id})
 	}
 
+	return nil
+}
+
+type errInvalidProfileName struct {
+	ProfileName string
+}
+
+func (e *errInvalidProfileName) Error() string {
+	return fmt.Sprintf("invalid Account ID %q", e.ProfileName)
+}
+
+func checkProfileName(profileName string) error {
+	if matched, err := regexp.Match(`[A-Za-z0-9\-\_]+`, []byte(profileName)); !matched || err != nil {
+		return fmt.Errorf("AWS Profile Name must be can only contain letters, numbers, hyphens, and underscores: %w", &errInvalidProfileName{ProfileName: profileName})
+	}
+
+	return nil
+}
+
+type errInvalidProfileAccount struct {
+	ProfileAccount string
+}
+
+func (e *errInvalidProfileAccount) Error() string {
+	return fmt.Sprintf("invalid Profile Name and Account ID %q", e.ProfileAccount)
+}
+
+func checkProfileAccount(v *viper.Viper) error {
+	profileAccounts := v.GetStringSlice(AWSProfileAccountFlag)
+	for _, profileAccount := range profileAccounts {
+		// Validate the profile name and account are separated by a colon
+		if !strings.Contains(profileAccount, ":") {
+			return fmt.Errorf("Each Profile Name and Account ID must be separated by a colon ':': %w", &errInvalidProfileAccount{ProfileAccount: profileAccount})
+		}
+		// Split out the profile name and account ID
+		profileAccountParts := strings.Split(profileAccount, ":")
+		profileName := profileAccountParts[0]
+		accountID := profileAccountParts[1]
+
+		if err := checkProfileName(profileName); err != nil {
+			return err
+		}
+		if err := checkAccountID(accountID); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
