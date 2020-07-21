@@ -22,6 +22,8 @@ func AddProfileInitFlags(flag *pflag.FlagSet) {
 	flag.String(AWSProfileFlag, "", "The AWS profile used to get the source_profile and mfa_serial attributes")
 	flag.String(AWSRegionFlag, endpoints.UsWest2RegionID, "The AWS region")
 	flag.String(IAMRoleFlag, "", "The IAM role name assigned to the user being setup")
+	flag.String(SourceProfileFlag, "", "The source_profile to use which overrides the one from the AWS profile being used")
+	flag.String(MfaSerialFlag, "", "The mfa_serial to use which overrides the one from the AWS profile being used")
 	flag.String(OutputFlag, "json", "The AWS CLI output format")
 
 	// Verbose
@@ -47,6 +49,15 @@ func AddProfileCheckConfig(v *viper.Viper) error {
 
 	if err := checkIAMRole(v); err != nil {
 		return fmt.Errorf("IAM Role check failed: %w", err)
+	}
+
+	awsProfile := v.GetString(AWSProfileFlag)
+	sourceProfile := v.GetString(SourceProfileFlag)
+	mfaSerial := v.GetString(MfaSerialFlag)
+	if len(awsProfile) == 0 {
+		if len(sourceProfile) == 0 || len(mfaSerial) == 0 {
+			return fmt.Errorf("No %q was provided. Must provide either %q or both %q and %q flags", AWSProfileFlag, AWSProfileFlag, SourceProfileFlag, MfaSerialFlag)
+		}
 	}
 
 	if err := checkOutput(v); err != nil {
@@ -84,20 +95,29 @@ func (apc *AddProfileConfig) AddProfile() error {
 		return fmt.Errorf("unable to load aws config file: %w", err)
 	}
 
-	roleProfileSection := iniFile.Section(fmt.Sprintf("profile %s", apc.AWSProfileName))
-	// Get the source profile
-	sourceProfileKey, err := roleProfileSection.GetKey("source_profile")
-	if err != nil {
-		return fmt.Errorf("Unable to get source profile from %q: %w", apc.AWSProfileName, err)
-	}
-	apc.BaseProfileName = sourceProfileKey.String()
+	// Pull profile details from existing AWS profile provided by user
+	if len(apc.AWSProfileName) != 0 {
 
-	// Get the MFA Serial
-	mfaSerialKey, err := roleProfileSection.GetKey("mfa_serial")
-	if err != nil {
-		return err
+		roleProfileSection := iniFile.Section(fmt.Sprintf("profile %s", apc.AWSProfileName))
+
+		// Get the source profile
+		if len(apc.BaseProfileName) == 0 {
+			sourceProfileKey, err := roleProfileSection.GetKey("source_profile")
+			if err != nil {
+				return fmt.Errorf("Unable to get source_profile from %q: %w", apc.AWSProfileName, err)
+			}
+			apc.BaseProfileName = sourceProfileKey.String()
+		}
+
+		// Get the MFA Serial
+		if len(apc.MFASerial) == 0 {
+			mfaSerialKey, err := roleProfileSection.GetKey("mfa_serial")
+			if err != nil {
+				return fmt.Errorf("Unable to get mfa_serial from %q: %w", apc.AWSProfileName, err)
+			}
+			apc.MFASerial = mfaSerialKey.String()
+		}
 	}
-	apc.MFASerial = mfaSerialKey.String()
 
 	// Add each of the remaining profiles
 	for _, profileAccount := range apc.AWSProfileAccounts {
@@ -175,6 +195,8 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 	awsProfileAccount := v.GetStringSlice(AWSProfileAccountFlag)
 	awsProfile := v.GetString(AWSProfileFlag)
 	iamRole := v.GetString(IAMRoleFlag)
+	sourceProfile := v.GetString(SourceProfileFlag)
+	mfaSerial := v.GetString(MfaSerialFlag)
 	output := v.GetString(OutputFlag)
 
 	// initialize things
@@ -203,7 +225,9 @@ func addProfileFunction(cmd *cobra.Command, args []string) error {
 
 	// Profiles
 	addProfileConfig.AWSProfileAccounts = awsProfileAccount
+	addProfileConfig.BaseProfileName = sourceProfile
 	addProfileConfig.AWSProfileName = awsProfile
+	addProfileConfig.MFASerial = mfaSerial
 
 	if err := addProfileConfig.Run(); err != nil {
 		logger.Fatal(err)
