@@ -30,6 +30,11 @@ const (
 	// IAMRoleFlag is the IAM Role name Flag
 	IAMRoleFlag string = "iam-role"
 
+	// SourceProfileFlag is the Source Profile Flag
+	SourceProfileFlag string = "source-profile"
+	// MfaSerialFlag is the MFA Serial Flag
+	MfaSerialFlag string = "mfa-serial"
+
 	// OutputFlag is the Output Flag
 	OutputFlag string = "output"
 
