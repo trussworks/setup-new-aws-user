@@ -91,7 +91,7 @@ output=json
 
 	testBaseSection, ok := config.ProfileSection("test-id-base")
 	suite.True(ok)
-	suite.Equal(len(testBaseSection.MfaSerial), 0)
+	suite.Equal(testBaseSection.MfaSerial, mfaSerial)
 	suite.Equal(testBaseSection.Region, "us-west-2")
 	// suite.Equal(testBaseSection.Output, "json")
 

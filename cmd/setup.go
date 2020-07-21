@@ -415,8 +415,9 @@ func (sc *SetupConfig) UpdateAWSConfigFile() error {
 	}
 
 	sc.BaseProfile = &vault.ProfileSection{
-		Name:   sc.BaseProfileName,
-		Region: sc.Region,
+		Name:      sc.BaseProfileName,
+		Region:    sc.Region,
+		MfaSerial: sc.MFASerial,
 	}
 
 	// Add the base profile
