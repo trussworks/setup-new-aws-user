@@ -94,5 +94,5 @@ output=json
 	suite.Equal(testSection.MfaSerial, mfaSerial)
 	suite.Equal(testSection.RoleARN, "arn:aws:iam::123456789012:role/test-role")
 	suite.Equal(testSection.Region, "us-west-2")
-	// suite.Equal(testBaseSection.Outpu"json")
+	// The 'output' is not returned in the config.ProfileSection struct and cannot be tested
 }
