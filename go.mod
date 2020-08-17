@@ -29,7 +29,7 @@ require (
 	golang.org/x/text v0.3.3 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
-	gopkg.in/ini.v1 v1.57.0
+	gopkg.in/ini.v1 v1.60.0
 )
 
 // Update to ignore compiler warnings on macOS catalina
