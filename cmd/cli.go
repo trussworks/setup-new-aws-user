@@ -87,6 +87,10 @@ func (e *errInvalidRegion) Error() string {
 func checkRegion(v *viper.Viper) error {
 
 	r := v.GetString(AWSRegionFlag)
+	// PartitionForRegion checks for the first region in a partition
+	// and for regions matching a regex pattern.
+	// So this checks if a region exists in any of the SDK regions, which are
+	// AWS Standard, AWS China, AWS GovCloud, AWS ISO, and AWS ISOB.
 	if _, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), r); !ok {
 		return fmt.Errorf("%s is invalid: %w", AWSRegionFlag, &errInvalidRegion{Region: r})
 	}
