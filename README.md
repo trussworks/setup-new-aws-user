@@ -35,6 +35,7 @@ Before running this tool, you will need to following pieces of information
 * IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
   and services. This is usually something like `admin` or `engineer`. Use the flag
   `--iam-role` with this value.
+* AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
 * AWS Profiles and Account IDs - This is the set of aws profile names you wish to
   add along with the corresponding AWS account ID. They are referenced as
   `<AWS_PROFILE>:<AWS_ACCOUNT_ID>`. Use the flag name `--aws-profile-account`
@@ -49,6 +50,7 @@ Before running this tool, you will need to following pieces of information
     setup-new-aws-user setup \
       --iam-user <USER> \
       --iam-role <ROLE> \
+      --aws-region <AWS_REGION> \
       --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
       --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
     ```
@@ -106,6 +108,7 @@ Before running this tool, you will need to following pieces of information
 * IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
   and services. This is usually something like `admin` or `engineer`. Use the flag
   `--iam-role` with this value.
+* AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
 * AWS profile - This is the name of the profile in your `~/.aws/config` profile
   that you wish to use as the basis for adding new profiles. The `source_profile`
   and `mfa_serial` is pulled from this profile.
@@ -121,6 +124,7 @@ Before running this tool, you will need to following pieces of information
     setup-new-aws-user add-profile \
       --aws-profile <AWS_PROFILE> \
       --iam-role <IAM_ROLE> \
+      --aws-region <AWS_REGION> \
       --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
       --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
     ```
