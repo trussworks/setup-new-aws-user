@@ -124,7 +124,7 @@ Before running this tool, you will need to following pieces of information
     setup-new-aws-user add-profile \
       --aws-profile <AWS_PROFILE> \
       --iam-role <IAM_ROLE> \
-      --aws-regin <AWS_REGION> \
+      --aws-region <AWS_REGION> \
       --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
       --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
     ```
