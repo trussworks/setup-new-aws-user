@@ -26,19 +26,19 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-        keys:
-          - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+          keys:
+            - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
       - run:
-        name: Run pre-commit
-        command: pre-commit run -a
+          name: Run pre-commit
+          command: pre-commit run -a
       - save_cache:
-        key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
-        paths:
-          - ~/.cache/pre-commit
+          key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+          paths:
+            - ~/.cache/pre-commit
 
 workflows:
   version: 2.1
-  test:
+  validate:
     jobs:
       - pre_commit
       - test:
