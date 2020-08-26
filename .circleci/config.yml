@@ -41,6 +41,6 @@ workflows:
   test:
     jobs:
       - pre_commit
-      - test
-        requires: 
-          - pre_commit
+      - test:
+          requires:
+            - pre_commit
