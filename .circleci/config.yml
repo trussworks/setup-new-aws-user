@@ -1,12 +1,12 @@
 version: 2.1
 
 references:
-  circleci-docker-primary: &circleci-docker-primary trussworks/circleci-docker-primary:27ce46fbf2088bd960cf75610908a7990514f84b
+  circleci: &circleci trussworks/circleci:56e6e6ef96436eff868243a7a0e42322c4df43c5
 
 jobs:
   test:
     docker:
-      - image: *circleci-docker-primary
+      - image: *circleci
     steps:
       - checkout
       - restore_cache:
