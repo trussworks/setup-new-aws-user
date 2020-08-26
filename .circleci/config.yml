@@ -1,35 +1,46 @@
 version: 2.1
 
 references:
-  circleci-docker-primary: &circleci-docker-primary trussworks/circleci-docker-primary:27ce46fbf2088bd960cf75610908a7990514f84b
+  circleci-go: &circleci-go trussworks/circleci-go:latest
+  circleci-pre-commit: &circleci-pre-commit trussworks/circleci-pre-commit:latest
 
 jobs:
   test:
     docker:
-      - image: *circleci-docker-primary
+      - image: *circleci-go
     steps:
       - checkout
       - restore_cache:
           keys:
-            - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
             - go-mod-sources-v1-{{ checksum "go.sum" }}
-      - run:
-          name: Run pre-commit
-          command: pre-commit run -a
       - run:
           name: Run Go tests
           command: make test
       - save_cache:
-          key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
-          paths:
-            - ~/.cache/pre-commit
-      - save_cache:
           key: go-mod-sources-v1-{{ checksum "go.sum" }}
           paths:
             - "~/go/pkg/mod"
+  pre_commit:
+    docker:
+      - image: *circleci-pre-commit
+    steps:
+      - checkout
+      - restore_cache:
+        keys:
+          - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+      - run:
+        name: Run pre-commit
+        command: pre-commit run -a
+      - save_cache:
+        key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+        paths:
+          - ~/.cache/pre-commit
 
 workflows:
   version: 2.1
   test:
     jobs:
+      - pre_commit
       - test
+        requires: 
+          - pre_commit
