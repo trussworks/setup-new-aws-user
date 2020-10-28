@@ -7,6 +7,9 @@ jobs:
   test:
     docker:
       - image: *circleci
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - restore_cache:
