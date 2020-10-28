@@ -7,6 +7,9 @@ jobs:
   test:
     docker:
       - image: *circleci
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - restore_cache:
@@ -32,4 +35,6 @@ workflows:
   version: 2.1
   test:
     jobs:
-      - test
+      - test:
+          context:
+            - org-global
