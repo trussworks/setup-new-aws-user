@@ -1,35 +1,37 @@
-version: 2.1
-
-references:
-  circleci: &circleci trussworks/circleci:56e6e6ef96436eff868243a7a0e42322c4df43c5
-
 jobs:
   test:
     docker:
-      - image: *circleci
+    - auth:
+        password: $DOCKER_PASSWORD
+        username: $DOCKER_USERNAME
+      image: trussworks/circleci:56e6e6ef96436eff868243a7a0e42322c4df43c5
     steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
-            - go-mod-sources-v1-{{ checksum "go.sum" }}
-      - run:
-          name: Run pre-commit
-          command: pre-commit run -a
-      - run:
-          name: Run Go tests
-          command: make test
-      - save_cache:
-          key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
-          paths:
-            - ~/.cache/pre-commit
-      - save_cache:
-          key: go-mod-sources-v1-{{ checksum "go.sum" }}
-          paths:
-            - "~/go/pkg/mod"
-
+    - checkout
+    - restore_cache:
+        keys:
+        - pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+        - go-mod-sources-v1-{{ checksum "go.sum" }}
+    - run:
+        command: pre-commit run -a
+        name: Run pre-commit
+    - run:
+        command: make test
+        name: Run Go tests
+    - save_cache:
+        key: pre-commit-dot-cache-{{ checksum ".pre-commit-config.yaml" }}
+        paths:
+        - ~/.cache/pre-commit
+    - save_cache:
+        key: go-mod-sources-v1-{{ checksum "go.sum" }}
+        paths:
+        - ~/go/pkg/mod
+references:
+  circleci: trussworks/circleci:56e6e6ef96436eff868243a7a0e42322c4df43c5
+version: 2.1
 workflows:
-  version: 2.1
   test:
     jobs:
-      - test
+    - test:
+        context:
+        - org-global
+  version: 2.1
