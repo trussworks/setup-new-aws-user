@@ -17,11 +17,19 @@ brew install setup-new-aws-user
 
 ### Dependencies
 
-This tool requires aws-vault be installed. You can install via homebrew:
+1. This tool requires aws-vault be installed. You can install via homebrew:
 
-```shell
-brew cask install aws-vault
-```
+    ```shell
+    brew install aws-vault
+    ```
+
+2. You will also need [direnv](https://direnv.net/) installed. If you don't have it, you can install in via homebrew:
+
+    ```shell
+    brew install direnv
+    ```
+
+3. [Set up direnv for your shell](https://direnv.net/docs/hook.html).
 
 ## Usage
 
