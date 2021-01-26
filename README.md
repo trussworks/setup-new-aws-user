@@ -20,7 +20,7 @@ brew install setup-new-aws-user
 This tool requires aws-vault be installed. You can install via homebrew:
 
 ```shell
-brew cask install aws-vault
+brew install aws-vault
 ```
 
 ## Usage
