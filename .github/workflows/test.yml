@@ -1,6 +1,5 @@
-name: tidy
-on:
-  #look into how to get it to run on every commit
+name: test
+on: push
 
 jobs:
   test:
@@ -9,24 +8,21 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v1
-      - name: restore_cache
-        uses: actions/cache@v2
-        with:
-          path: #ask eady about this
-          key: pre-commit-dot-cache-${{ hashFiles('**/pre-commit-config.yaml') }}
-          restore-keys: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
-      - name: Run pre-commit
-        run: pre-commit run -a
-      - name: Run Go tests
-        run: make test
-      - name: save_cache_pre-commit
+      - name: cache_pre-commit
         uses: actions/cache@v2
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-dot-cache-${{ hashFiles('**/pre-commit-config.yaml') }}
-          #ask about restore keys
-      - name: save_cache_mod
+          restore-keys: pre-commit-dot-cache
+      - name: cache_mod
         uses: actions/cache@v2
         with:
           path: ~/go/pkg/mod
           key: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-mod-sources-v1
+      - name: Run pre-commit
+        run: pre-commit run -a
+      - name: Run Go tests
+        run: make test
+
+        
