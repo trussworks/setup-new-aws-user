@@ -21,7 +21,8 @@ jobs:
           key: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
           restore-keys: go-mod-sources-v1
       - name: Run pre-commit
-        run: run -a
+        run: pre-commit run -a
+        working-directory: ~/.cache/pre-commit
       - name: Run Go tests
         run: make test
 
