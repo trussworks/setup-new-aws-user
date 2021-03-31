@@ -12,7 +12,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.cache/pre-commit
-          key: pre-commit-dot-cache-${{ hashFiles('**/pre-commit-config.yaml') }}
+          key: pre-commit-dot-cache-${{ hashFiles('**/.pre-commit-config.yaml') }}
           restore-keys: pre-commit-dot-cache
       - name: cache_mod
         uses: actions/cache@v2
@@ -22,7 +22,6 @@ jobs:
           restore-keys: go-mod-sources-v1
       - name: Run pre-commit
         run: pre-commit run -a
-        working-directory: ~/.cache/pre-commit
       - name: Run Go tests
         run: make test
 
