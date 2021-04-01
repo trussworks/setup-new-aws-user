@@ -8,6 +8,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v2.1.4
       - uses: actions/setup-python@v2
+      - uses: goreleaser/goreleaser-action@v2
       - name: checkout
         uses: actions/checkout@v1
       - name: cache_pre-commit
