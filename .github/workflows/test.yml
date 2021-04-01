@@ -22,7 +22,7 @@ jobs:
           restore-keys: go-mod-sources-v1
       - uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.27.0
+          version: v1.28
       - uses: actions/setup-node@v2.1.4
       - name: Install markdownlint-cli
         run: sudo npm install -g markdownlint-cli@v0.23.1
