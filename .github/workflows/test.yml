@@ -6,6 +6,10 @@ jobs:
     name: run tests
     runs-on: ubuntu-latest
     steps:
+      - name: checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v2.1.4
       - uses: actions/setup-python@v2
       - uses: actions/setup-go@v2
@@ -13,8 +17,6 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
-      - name: checkout
-        uses: actions/checkout@v1
       - name: cache_pre-commit
         uses: actions/cache@v2
         with:
