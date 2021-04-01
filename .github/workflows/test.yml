@@ -22,13 +22,7 @@ jobs:
           path: ~/go/pkg/mod
           key: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
           restore-keys: go-mod-sources-v1
-      # - uses: golangci/golangci-lint-action@v2
-      #   with:
-      #     version: v1.28
-      # - name: Install markdownlint-cli
-      #   run: sudo npm install -g markdownlint-cli@v0.23.1
       - uses: pre-commit/action@v2.0.0
       - name: Run Go tests
         run: make test
-
         
