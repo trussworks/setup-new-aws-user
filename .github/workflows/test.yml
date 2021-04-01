@@ -8,21 +8,21 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v1
-        with:
-          fetch-depth: 0
+        # with:
+        #   fetch-depth: 0
       - uses: actions/setup-node@v2.1.4
       - uses: actions/setup-python@v2
       - uses: actions/setup-go@v2
-      - uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --rm-dist
-      - name: cache_pre-commit
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-dot-cache-${{ hashFiles('**/.pre-commit-config.yaml') }}
-          restore-keys: pre-commit-dot-cache
+      # - uses: goreleaser/goreleaser-action@v2
+      #   with:
+      #     version: latest
+      #     args: release --rm-dist
+      # - name: cache_pre-commit
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: ~/.cache/pre-commit
+      #     key: pre-commit-dot-cache-${{ hashFiles('**/.pre-commit-config.yaml') }}
+      #     restore-keys: pre-commit-dot-cache
       - name: cache_mod
         uses: actions/cache@v2
         with:
