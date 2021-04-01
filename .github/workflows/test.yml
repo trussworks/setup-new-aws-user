@@ -27,8 +27,6 @@ jobs:
       - name: Install markdownlint-cli
         run: sudo npm install -g markdownlint-cli@v0.23.1
       - uses: pre-commit/action@v2.0.0
-      - name: Run pre-commit
-        run: pre-commit run -a
       - name: Run Go tests
         run: make test
 
