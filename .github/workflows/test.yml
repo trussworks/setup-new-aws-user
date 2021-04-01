@@ -26,4 +26,3 @@ jobs:
       - uses: pre-commit/action@v2.0.0
       - name: Run Go tests
         run: make test
-        
