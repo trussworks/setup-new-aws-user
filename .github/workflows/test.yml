@@ -6,6 +6,7 @@ jobs:
     name: run tests
     runs-on: ubuntu-latest
     steps:
+      - uses: pre-commit/action@v2.0.0
       - name: checkout
         uses: actions/checkout@v1
       - name: cache_pre-commit
@@ -21,7 +22,6 @@ jobs:
           key: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
           restore-keys: go-mod-sources-v1
       - name: Run pre-commit
-        uses: pre-commit/action@v2.0.0
         run: pre-commit run -a
       - name: Run Go tests
         run: make test
