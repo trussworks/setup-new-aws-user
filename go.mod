@@ -1,6 +1,6 @@
 module github.com/trussworks/setup-new-aws-user
 
-go 1.14
+go 1.16
 
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
