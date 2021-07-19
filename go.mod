@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
 	github.com/99designs/keyring v1.1.6
-	github.com/aws/aws-sdk-go v1.39.4
+	github.com/aws/aws-sdk-go v1.40.2
 	github.com/danieljoos/wincred v1.1.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
