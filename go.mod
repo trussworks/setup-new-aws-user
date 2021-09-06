@@ -21,7 +21,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200707235045-ab33eee955e0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
-	gopkg.in/ini.v1 v1.62.0
+	gopkg.in/ini.v1 v1.62.1
 )
 
 // Update to ignore compiler warnings on macOS catalina
