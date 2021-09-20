@@ -8,20 +8,17 @@ require (
 	github.com/aws/aws-sdk-go v1.40.41
 	github.com/danieljoos/wincred v1.1.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
-	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/keybase/go-keychain v0.0.0-20200502122510-cda31fe0c86d // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.8.1
+	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/crypto v0.0.0-20200707235045-ab33eee955e0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
-	gopkg.in/ini.v1 v1.63.0
+	gopkg.in/ini.v1 v1.63.2
 )
 
 // Update to ignore compiler warnings on macOS catalina
