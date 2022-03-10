@@ -16,6 +16,8 @@ import (
 
 const maxMFATokenPromptAttempts = 5
 
+var globalMFACodeMap = make(map[string]string)
+
 func promptMFAtoken(messagePrefix string, logger *log.Logger) string {
 	var token string
 	for attempts := maxMFATokenPromptAttempts; token == "" && attempts > 0; attempts-- {
@@ -29,6 +31,12 @@ func promptMFAtoken(messagePrefix string, logger *log.Logger) string {
 			logger.Println("MFA token must be 6 digits. Please try again.")
 			continue
 		}
+
+		if _, found := globalMFACodeMap[t]; found {
+			logger.Println("MFA token has already been used. Please try again.")
+			continue
+		}
+		globalMFACodeMap[t] = t
 		token = t
 	}
 	return token
