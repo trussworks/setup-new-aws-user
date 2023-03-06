@@ -31,29 +31,29 @@ This tool has several subcommands. Read each section to learn more.
 
 Before running this tool, you will need to following pieces of information
 
-* IAM user name - This is your IAM username. Use the flag `--iam-user` with this value.
-* IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
+- IAM user name - This is your IAM username. Use the flag `--iam-user` with this value.
+- IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
   and services. This is usually something like `admin` or `engineer`. Use the flag
   `--iam-role` with this value.
-* AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
-* AWS Profiles and Account IDs - This is the set of aws profile names you wish to
+- AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
+- AWS Profiles and Account IDs - This is the set of aws profile names you wish to
   add along with the corresponding AWS account ID. They are referenced as
   `<AWS_PROFILE>:<AWS_ACCOUNT_ID>`. Use the flag name `--aws-profile-account`
   with each set you wish to add.
-* Temporary AWS access keys - These should be given to you by an administrator
+- Temporary AWS access keys - These should be given to you by an administrator
   of the AWS account you are trying to access. The tool will prompt you for
   the access key id and secret access key.
 
 1. Run the setup-new-user script
 
-    ```sh
-    setup-new-aws-user setup \
-      --iam-user <USER> \
-      --iam-role <ROLE> \
-      --aws-region <AWS_REGION> \
-      --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
-      --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
-    ```
+   ```sh
+   setup-new-aws-user setup \
+     --iam-user <USER> \
+     --iam-role <ROLE> \
+     --aws-region <AWS_REGION> \
+     --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
+     --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
+   ```
 
 2. Enter the access keys generated when prompted.
 3. The script will open a window with a QR code, which you will use to configure a temporary one time password (TOTP).
@@ -62,9 +62,9 @@ Before running this tool, you will need to following pieces of information
 6. From here the tool will prompt you for 3 unique TOTP tokens. **NOTE Take care not to use the same token more than once, as this will cause the process to fail.**
 7. Once the tool has completed, you should be able to access the AWS account. You can run the following command filling in the `AWS_PROFILE` value
 
-    ```sh
-    aws-vault exec $AWS_PROFILE -- aws sts get-session
-    ```
+   ```sh
+   aws-vault exec $AWS_PROFILE -- aws sts get-session
+   ```
 
 #### How `setup` modifies your ~/.aws/config
 
@@ -105,35 +105,35 @@ above.
 
 Before running this tool, you will need to following pieces of information
 
-* IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
+- IAM role name - This is the IAM Role with permissions allowing access to AWS APIs
   and services. This is usually something like `admin` or `engineer`. Use the flag
   `--iam-role` with this value.
-* AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
-* AWS profile - This is the name of the profile in your `~/.aws/config` profile
+- AWS Region - This utility will default to "us-west-2" so if you are using this tool for GovCloud or other partitions you will need to provide a region specific to that partition.
+- AWS profile - This is the name of the profile in your `~/.aws/config` profile
   that you wish to use as the basis for adding new profiles. The `source_profile`
   and `mfa_serial` is pulled from this profile.
   Use the flag name `--aws-profile` with this value.
-* AWS Profiles and Account IDs - This is the set of aws profile names you wish to
+- AWS Profiles and Account IDs - This is the set of aws profile names you wish to
   add along with the corresponding AWS account ID. They are referenced as
   `<AWS_PROFILE>:<AWS_ACCOUNT_ID>`. Use the flag name `--aws-profile-account`
   with each set you wish to add.
 
 1. Run the setup-new-user script -
 
-    ```sh
-    setup-new-aws-user add-profile \
-      --aws-profile <AWS_PROFILE> \
-      --iam-role <IAM_ROLE> \
-      --aws-region <AWS_REGION> \
-      --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
-      --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
-    ```
+   ```sh
+   setup-new-aws-user add-profile \
+     --aws-profile <AWS_PROFILE> \
+     --iam-role <IAM_ROLE> \
+     --aws-region <AWS_REGION> \
+     --aws-profile-account <AWS_PROFILE1>:<AWS_ACCOUNT_ID1> \
+     --aws-profile-account <AWS_PROFILE2>:<AWS_ACCOUNT_ID2>
+   ```
 
 2. Once the tool has completed, you should be able to access the AWS account. You can run the following command filling in the `AWS_PROFILE` value
 
-    ```sh
-    aws-vault exec $AWS_PROFILE -- aws sts get-session
-    ```
+   ```sh
+   aws-vault exec $AWS_PROFILE -- aws sts get-session
+   ```
 
 #### How `add-profile` modifies your ~/.aws/config
 
@@ -231,7 +231,6 @@ aws iam delete-virtual-mfa-device --serial-number "$SERIAL"
 If the device was registered to a user it may need to be deactivated first, in which case its easier to find the
 `SERIAL` programatically:
 
-
 ```sh
 export USERNAME=somebody
 SERIAL=$(aws iam list-mfa-devices --user-name "${USERNAME}" | jq -r ".MFADevices[].SerialNumber")
@@ -240,3 +239,7 @@ aws iam delete-virtual-mfa-device --serial-number "$SERIAL"
 ```
 
 Now the device should be completely removed. Have them re-run the script.
+
+#### Publishing a release to Homebrew
+
+This application is published to Homebrew and is done so via [goreleaser](https://goreleaser.com/) with the configuration defined in `.goreleaser.yml` and the `.github/workflows/release-macos.yml` GitHub Action that runs when a tag is created. To get the specifics of how this works, you can see the doc written [here](https://playbook.truss.dev/docs/developing/command-line-tools/HOW2GORELEASER). _hint_ Check 1password for Truss Infra GitHub credentials and a token attached. That's `GH_TOKEN` defined in the action.
