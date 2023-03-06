@@ -4,12 +4,12 @@ before:
   hooks:
     - go mod download
 builds:
-- goos:
-    - darwin
-    - linux
-  goarch:
-    - amd64
-  main: ./cmd/
+  - goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+    main: ./cmd/
 brews:
   - description: "A tool that creates a virtual MFA device and rotates access keys for a new AWS user."
     tap:
@@ -20,13 +20,15 @@ brews:
       name: trussworks-infra
       email: infra+github@truss.works
 archives:
-  -
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      amd64: x86_64
+  - id: foo
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
   algorithm: sha256
 snapshot:
   name_template: "{{ .Tag }}-next"
@@ -34,5 +36,5 @@ changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
+      - "^docs:"
+      - "^test:"
