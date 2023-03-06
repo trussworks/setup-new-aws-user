@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"testing"
@@ -17,7 +17,7 @@ type setupTestSuite struct {
 
 func (suite *setupTestSuite) Setup() {
 	// Disable any logging that isn't attached to the logger unless using the verbose flag
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	log.SetFlags(0)
 
 	// Setup logger
