@@ -18,6 +18,8 @@ require (
 
 require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
+	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
@@ -36,13 +38,17 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20190402232053-79abb63cd66e // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
+	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
