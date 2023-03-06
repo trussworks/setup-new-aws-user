@@ -36,10 +36,10 @@ goreleaser_check: ## Goreleaser check configuration
 
 .PHONY: goreleaser_build
 goreleaser_build: ## Goreleaser build configuration
-	goreleaser build --snapshot --rm-dist
+	goreleaser build --snapshot --clean
 
 .PHONY: goreleaser_test
 goreleaser_test: ## Goreleaser test configuration
-	goreleaser --snapshot --skip-publish --rm-dist
+	goreleaser --snapshot --skip-publish --clean
 
 default: help
