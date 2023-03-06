@@ -1,11 +1,3 @@
-linters-settings:
-  govet:
-    check-shadowing: true
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: github.com/trussworks/setup-new-aws-user/cmd
-
 linters:
   enable:
     - deadcode
