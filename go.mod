@@ -3,7 +3,7 @@ module github.com/trussworks/setup-new-aws-user
 go 1.20
 
 require (
-	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
+	github.com/99designs/aws-vault v4.5.1+incompatible
 	github.com/99designs/keyring v1.2.2
 	github.com/aws/aws-sdk-go v1.44.214
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
@@ -22,6 +22,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
