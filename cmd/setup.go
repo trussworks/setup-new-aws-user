@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -494,7 +494,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	verbose := v.GetBool(VerboseFlag)
 	if !verbose {
 		// Disable any logging that isn't attached to the logger unless using the verbose flag
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 		log.SetFlags(0)
 
 		// Remove the flags for the logger
@@ -534,7 +534,7 @@ func setupUserFunction(cmd *cobra.Command, args []string) error {
 	baseProfileName := fmt.Sprintf("%s-base", awsBaseProfile)
 
 	// Create a Temp File
-	tempfile, err := ioutil.TempFile("", "temp-qr.*.png")
+	tempfile, err := os.CreateTemp("", "temp-qr.*.png")
 	if err != nil {
 		logger.Fatal(err)
 	}

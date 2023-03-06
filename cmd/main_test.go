@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -23,7 +23,7 @@ type initFlags func(f *pflag.FlagSet)
 
 func (suite *commandTestSuite) Setup(fn initFlags, flagSet []string) {
 	// Disable any logging that isn't attached to the logger unless using the verbose flag
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	log.SetFlags(0)
 
 	// Setup logger

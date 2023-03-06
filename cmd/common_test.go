@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -9,11 +8,11 @@ import (
 )
 
 func newConfigFile(t *testing.T, b []byte) string {
-	f, err := ioutil.TempFile("", "aws-config")
+	f, err := os.CreateTemp("", "aws-config")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(f.Name(), b, 0600); err != nil {
+	if err := os.WriteFile(f.Name(), b, 0600); err != nil {
 		t.Fatal(err)
 	}
 	return f.Name()
@@ -28,7 +27,7 @@ func TestCommonSuite(t *testing.T) {
 }
 
 func (suite *commonTestSuite) TestGenerateQrCode() {
-	tempFile, err := ioutil.TempFile("", "temp-qr.*.png")
+	tempFile, err := os.CreateTemp("", "temp-qr.*.png")
 	suite.NoError(err)
 	defer func() {
 		errRemove := os.Remove(tempFile.Name())
