@@ -1,0 +1,35 @@
+{
+  "extends": [
+    "config:base"
+  ],
+  "packageRules": [
+    {
+      "description": "Tag the waddlers Github Team for major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "reviewers": [
+        "team:waddlers"
+      ]
+    },
+    {
+      "automerge": true,
+      "description": "Group minor and patch updates into a single PR",
+      "groupName": "dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ]
+    }
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "schedule": [
+    "every weekday",
+    "after 9am and before 5pm"
+  ],
+  "timezone": "America/Los_Angeles"
+}
