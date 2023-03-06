@@ -19,12 +19,6 @@ jobs:
         with:
           install-only: true
           version: latest
-      - name: cache_mod
-        uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: go-mod-sources-v1-${{ hashFiles('**/go.sum') }}
-          restore-keys: go-mod-sources-v1
       - uses: pre-commit/action@v2.0.0
       - name: Run Go tests
         run: make test
