@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v2.1.4
       - uses: actions/setup-python@v2
       - uses: actions/setup-go@v2
+        with:
+          go-versions: "1.17.13"
       - uses: goreleaser/goreleaser-action@v2
         with:
           install-only: true
