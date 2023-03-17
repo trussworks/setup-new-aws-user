@@ -10,7 +10,7 @@ jobs:
         uses: actions/checkout@v1
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v2.1.4
+      - uses: actions/setup-node@v2.5.1
       - uses: actions/setup-python@v2
       - uses: actions/setup-go@v2
         with:
@@ -19,6 +19,6 @@ jobs:
         with:
           install-only: true
           version: latest
-      - uses: pre-commit/action@v2.0.0
+      - uses: pre-commit/action@v2.0.3
       - name: Run Go tests
         run: make test
