@@ -6,13 +6,13 @@ require (
 	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
 	github.com/99designs/keyring v1.2.2
 	github.com/aws/aws-sdk-go v1.44.224
+	github.com/go-playground/validator/v10 v10.12.0
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
-	gopkg.in/go-playground/validator.v10 v10.12.0
 	gopkg.in/ini.v1 v1.67.0
 )
 
@@ -40,10 +40,10 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
-	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

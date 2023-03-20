@@ -17,10 +17,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/go-playground/validator/v10"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/ini.v1"
 )
 
