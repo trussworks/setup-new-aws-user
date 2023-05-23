@@ -53,6 +53,6 @@ func main() {
 	root.AddCommand(versionCommand)
 
 	if err := root.Execute(); err != nil {
-		panic(err)
+		os.Exit(1)
 	}
 }
