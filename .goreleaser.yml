@@ -1,4 +1,3 @@
----
 env:
   - GO111MODULE=on
 before:
@@ -11,7 +10,7 @@ builds:
     goarch:
       - amd64
     main: ./cmd/
-repository:
+brews:
   - description: "A tool that creates a virtual MFA device and rotates access keys for a new AWS user."
     tap:
       owner: trussworks
