@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.1
+    rev: v1.55.2
     hooks:
       - id: golangci-lint
         entry: golangci-lint run --fix --timeout 300s
