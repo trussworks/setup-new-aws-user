@@ -5,8 +5,8 @@ go 1.20
 require (
 	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
 	github.com/99designs/keyring v1.2.2
-	github.com/aws/aws-sdk-go v1.49.20
-	github.com/go-playground/validator/v10 v10.16.0
+	github.com/aws/aws-sdk-go v1.49.21
+	github.com/go-playground/validator/v10 v10.17.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.8.0
