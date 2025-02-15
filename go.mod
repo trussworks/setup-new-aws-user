@@ -6,10 +6,10 @@ require (
 	github.com/99designs/aws-vault v1.0.1-0.20200507051055-ae369037cc75
 	github.com/99designs/keyring v1.2.2
 	github.com/aws/aws-sdk-go v1.55.6
-	github.com/go-playground/validator/v10 v10.24.0
+	github.com/go-playground/validator/v10 v10.25.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.0
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
